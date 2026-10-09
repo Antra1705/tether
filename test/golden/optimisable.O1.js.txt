@@ -1,0 +1,12 @@
+"use strict";
+function area(w, h) {
+  return w * h;
+}
+let secondsPerDay = 86400;
+{
+  console.log("always");
+}
+console.log(secondsPerDay);
+console.log(area(2, 3) + 3);
+console.log("tether-o1");
+//# sourceMappingURL=optimisable.js.map

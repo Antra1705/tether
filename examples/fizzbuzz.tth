@@ -1,0 +1,32 @@
+// FizzBuzz. Exercises strings, && and ||, unary !, else-if chains, and a
+// variable whose name is a JavaScript reserved word (`var`).
+
+fn divides(d: int, n: int): bool {
+  return n % d == 0;
+}
+
+fn isPlain(n: int): bool {
+  return !(divides(3, n) || divides(5, n));
+}
+
+fn fizzbuzz(n: int): string {
+  let var: string = "";
+  if (divides(3, n) && divides(5, n)) {
+    var = "FizzBuzz";
+  } else if (divides(3, n)) {
+    var = "Fizz";
+  } else if (divides(5, n)) {
+    var = "Buzz";
+  }
+  return var;
+}
+
+let i = 1;
+while (i <= 30) {
+  if (isPlain(i)) {
+    print(i);
+  } else {
+    print(fizzbuzz(i));
+  }
+  i += 1;
+}

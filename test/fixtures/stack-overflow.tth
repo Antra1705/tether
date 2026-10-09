@@ -1,0 +1,9 @@
+// A runtime error: the recursion never stops, so the stack overflows.
+// Run the compiled program with --enable-source-maps to see the error
+// reported at this file's line and column instead of the generated JavaScript.
+
+fn down(n: int): int {
+  return down(n + 1) + 1;
+}
+
+print(down(0));

@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tether Playground</title>
+<style>
+  /* Layout: a compiler workbench. A phase strip across the top, the source on
+     the left, and the selected phase's output on the right. Hovering any
+     output row lights up its span in the source. */
+  :root {
+    --bg: #f3f5f8;
+    --panel: #ffffff;
+    --sunken: #f7f8fb;
+    --fg: #18202c;
+    --muted: #5b6779;
+    --line: #dde2ea;
+    --accent: #2f5bd3;
+    --accent-soft: #e6ecfb;
+    --lit: #9a5b00;
+    --hl: rgba(255, 184, 48, 0.42);
+    --err: #c42b3a;
+    --err-soft: #fbe9eb;
+    --ok: #1d7f48;
+    --ok-soft: #e3f4ea;
+    --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --font-code: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --code-size: 13px;
+    --code-line: 20px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1218; --panel: #151a22; --sunken: #11161d; --fg: #e3e8ef; --muted: #8b97a9;
+      --line: #263040; --accent: #7fa3ff; --accent-soft: #1c2740; --lit: #e0a84f;
+      --hl: rgba(255, 184, 48, 0.30); --err: #ff6b78; --err-soft: #34181d; --ok: #4fc483; --ok-soft: #142a1f;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1218; --panel: #151a22; --sunken: #11161d; --fg: #e3e8ef; --muted: #8b97a9;
+    --line: #263040; --accent: #7fa3ff; --accent-soft: #1c2740; --lit: #e0a84f;
+    --hl: rgba(255, 184, 48, 0.30); --err: #ff6b78; --err-soft: #34181d; --ok: #4fc483; --ok-soft: #142a1f;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 var(--font-ui);
+    display: flex; flex-direction: column;
+  }
+  button, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .boot {
+    margin: 16px; padding: 12px 16px; border: 1px solid var(--err); background: var(--err-soft);
+    border-radius: 6px;
+  }
+  .boot code { font-family: var(--font-code); }
+
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px;
+    padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  .brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-right: auto; }
+  .brand h1 { margin: 0; font-size: 18px; letter-spacing: -0.01em; }
+  .brand p { margin: 0; color: var(--muted); font-size: 13px; }
+  .controls { display: flex; gap: 8px; align-items: center; }
+  .controls label { color: var(--muted); font-size: 13px; }
+  .controls .opt { display: flex; align-items: center; gap: 6px; color: var(--fg); font-family: var(--font-code); cursor: pointer; }
+  select, .btn {
+    height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--sunken); cursor: pointer;
+  }
+  .btn:hover, select:hover { border-color: var(--accent); }
+
+  /* Phase strip */
+  .phases {
+    display: flex; gap: 0; overflow-x: auto; padding: 12px 20px;
+    border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  .phase {
+    flex: 1 0 128px; display: flex; flex-direction: column; gap: 2px;
+    padding: 8px 12px; border: 1px solid var(--line); margin-left: -1px; background: var(--sunken);
+  }
+  .phase:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+  .phase:last-child { border-radius: 0 6px 6px 0; }
+  .phase .name { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .phase .state { font-size: 13px; font-variant-numeric: tabular-nums; }
+  .phase.ok { background: var(--ok-soft); }
+  .phase.ok .state { color: var(--ok); font-weight: 600; }
+  .phase.bad { background: var(--err-soft); }
+  .phase.bad .state { color: var(--err); font-weight: 600; }
+  .phase.todo .state { color: var(--muted); }
+
+  main {
+    flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px; padding: 16px 20px;
+  }
+  .pane {
+    min-width: 0; min-height: 0; display: flex; flex-direction: column;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+  }
+  .pane-head {
+    display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .pane-head .file { font-family: var(--font-code); font-size: 12.5px; color: var(--muted); }
+
+  /* Editor: a transparent textarea over a highlight layer with identical metrics. */
+  .editor { flex: 1; min-height: 320px; display: flex; position: relative; background: var(--panel); }
+  .gutter {
+    flex: none; width: 48px; overflow: hidden; padding: 12px 8px 12px 0; text-align: right;
+    font: var(--code-size)/var(--code-line) var(--font-code); color: var(--muted);
+    background: var(--sunken); border-right: 1px solid var(--line); user-select: none;
+    font-variant-numeric: tabular-nums; white-space: pre;
+  }
+  .code { flex: 1; position: relative; min-width: 0; }
+  .code pre, .code textarea {
+    position: absolute; inset: 0; margin: 0; padding: 12px 14px; border: 0;
+    font: var(--code-size)/var(--code-line) var(--font-code); tab-size: 4;
+    white-space: pre; overflow-wrap: normal; letter-spacing: 0;
+  }
+  .code pre { overflow: hidden; color: transparent; pointer-events: none; padding-bottom: 40px; }
+  .code textarea {
+    width: 100%; height: 100%; resize: none; outline: none; overflow: auto;
+    background: transparent; color: var(--fg); caret-color: var(--accent);
+  }
+  .code mark { color: transparent; background: none; border-radius: 2px; }
+  .code mark.hl { background: var(--hl); }
+  .code mark.err {
+    text-decoration: underline wavy var(--err); text-decoration-skip-ink: none;
+    text-underline-offset: 4px;
+  }
+  .code .pt { display: inline-block; width: 0; height: var(--code-line); vertical-align: top; }
+  .code .pt.err { border-left: 2px solid var(--err); }
+  .code .pt.hl { border-left: 2px solid var(--lit); }
+
+  .statusbar {
+    display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: space-between;
+    padding: 8px 12px; border-top: 1px solid var(--line); background: var(--sunken);
+    font: 12px/1.5 var(--font-code); color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .statusbar b { color: var(--fg); font-weight: 600; }
+  .statusbar .map { color: var(--accent); }
+
+  /* Output tabs */
+  .tabs { display: flex; gap: 2px; align-self: stretch; overflow-x: auto; min-width: 0; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    border: 0; background: none; padding: 0 12px; cursor: pointer; color: var(--muted);
+    border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  }
+  .tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
+  .count {
+    font-size: 11px; min-width: 20px; padding: 1px 6px; border-radius: 10px; text-align: center;
+    background: var(--sunken); border: 1px solid var(--line); font-variant-numeric: tabular-nums;
+  }
+  .count.bad { background: var(--err); border-color: var(--err); color: var(--panel); }
+  .hint { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+  .out { flex: 1; min-height: 320px; overflow: auto; }
+  .row {
+    display: flex; align-items: baseline; gap: 10px; padding: 1px 12px; cursor: pointer;
+    font: var(--code-size)/var(--code-line) var(--font-code); white-space: pre;
+  }
+  .row:hover { background: var(--accent-soft); }
+  .row.current { background: var(--hl); }
+  .row .sp { margin-left: auto; padding-left: 16px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* Tokens */
+  .tok-kind { width: 64px; flex: none; font-size: 11.5px; color: var(--muted); }
+  .tok-pos { width: 72px; flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .k-Keyword { color: var(--accent); font-weight: 600; }
+  .k-Int, .k-String, .k-Bool { color: var(--lit); }
+  .k-Punct, .k-EOF { color: var(--muted); }
+  .k-Error { color: var(--err); font-weight: 600; }
+
+  /* AST: indent guides drawn from the depth */
+  .ast .row {
+    padding-left: calc(12px + var(--d) * 18px);
+    background-image: repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px 18px);
+    background-size: calc(var(--d) * 18px) 100%; background-repeat: no-repeat; background-position: 16px 0;
+  }
+  .ast .row:hover { background-color: var(--accent-soft); }
+  .ast .row.current { background-color: var(--hl); }
+  .field { color: var(--muted); }
+  .kind { font-weight: 600; }
+  .extra { color: var(--lit); }
+
+  /* Diagnostics */
+  .diags { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+  .diag { border: 1px solid var(--line); border-left: 3px solid var(--err); border-radius: 6px; cursor: pointer; }
+  .diag.note { border-left-color: var(--muted); }
+  .diag:hover { background: var(--accent-soft); }
+  .diag-head { padding: 8px 12px 4px; font-weight: 600; }
+  .diag-head .loc { font-family: var(--font-code); font-weight: 400; color: var(--muted); margin-right: 6px; }
+  .diag pre {
+    margin: 0; padding: 4px 12px 10px; overflow-x: auto; tab-size: 4;
+    font: var(--code-size)/var(--code-line) var(--font-code); color: var(--muted);
+  }
+  .diag pre .caret { color: var(--err); font-weight: 700; }
+  .clean { margin: 24px; padding: 16px; border-radius: 8px; background: var(--ok-soft); }
+  .clean.waiting { background: var(--sunken); }
+  .clean.waiting strong { color: var(--fg); }
+  .note-head { font-weight: 500; color: var(--muted); padding-top: 2px; }
+  .badge {
+    font-size: 11px; line-height: 16px; padding: 0 5px; border-radius: 4px;
+    border: 1px solid var(--line); color: var(--muted); font-family: var(--font-ui);
+  }
+
+  /* Generated JavaScript: one underlined segment per source-map entry */
+  .js { padding: 10px 0; }
+  .jsline { display: flex; font: var(--code-size)/var(--code-line) var(--font-code); white-space: pre; }
+  .jsline .ln {
+    flex: none; width: 44px; padding-right: 14px; text-align: right; color: var(--muted);
+    user-select: none; font-variant-numeric: tabular-nums;
+  }
+  .seg { cursor: pointer; border-radius: 2px; box-shadow: inset 0 -1px 0 var(--line); }
+  .seg:hover { background: var(--accent-soft); }
+  .seg.current { background: var(--hl); }
+
+  /* Run */
+  .run { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .run-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .run-bar .hint { margin-left: 0; }
+  .run pre {
+    margin: 0; padding: 10px 12px; min-height: 160px; white-space: pre-wrap;
+    background: var(--sunken); border: 1px solid var(--line); border-radius: 6px;
+    font: var(--code-size)/var(--code-line) var(--font-code);
+  }
+  .run .err { color: var(--err); }
+  .run .muted { color: var(--muted); }
+  .clean strong { color: var(--ok); }
+  .clean p { margin: 4px 0 0; color: var(--muted); max-width: 60ch; }
+
+  footer { padding: 0 20px 14px; color: var(--muted); font-size: 12px; }
+  footer code { font-family: var(--font-code); }
+
+  @media (max-width: 900px) {
+    main { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; }
+    header, .phases { padding-left: 16px; padding-right: 16px; }
+    .editor { min-height: 50vh; }
+    .hint { display: none; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .row, .diag, .tab { transition: background-color 80ms; }
+  }
+</style>
+</head>
+<body>
+
+<div class="boot" id="boot">
+  The playground needs to be served over HTTP, because browsers block ES modules on <code>file://</code> pages.
+  In the project folder, run <code>npm run playground</code> and open the address it prints.
+</div>
+
+<header>
+  <div class="brand">
+    <h1>Tether Playground</h1>
+    <p>All 8 milestones: type checker, JavaScript emitter, source maps and -O1</p>
+  </div>
+  <div class="controls">
+    <label for="example">Program</label>
+    <select id="example"></select>
+    <label class="opt" title="Constant folding and dead-code removal"><input type="checkbox" id="optimise"> -O1</label>
+    <button class="btn" id="reset" type="button" title="Discard edits and reload this program">Reset</button>
+  </div>
+</header>
+
+<nav class="phases" id="phases" aria-label="Compiler phases"></nav>
+
+<main>
+  <section class="pane" aria-label="Source">
+    <div class="pane-head"><span class="file" id="filename"></span></div>
+    <div class="editor">
+      <div class="gutter" id="gutter" aria-hidden="true"></div>
+      <div class="code">
+        <pre id="highlight" aria-hidden="true"></pre>
+        <textarea id="source" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-label="Tether source code"></textarea>
+      </div>
+    </div>
+    <div class="statusbar">
+      <span id="cursor"></span>
+      <span id="spaninfo"></span>
+    </div>
+  </section>
+
+  <section class="pane" aria-label="Compiler output">
+    <div class="pane-head">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tab-diagnostics" data-tab="diagnostics" type="button">Diagnostics <span class="count" id="count-diagnostics">0</span></button>
+        <button class="tab" role="tab" id="tab-tokens" data-tab="tokens" type="button">Tokens <span class="count" id="count-tokens">0</span></button>
+        <button class="tab" role="tab" id="tab-ast" data-tab="ast" type="button">Syntax tree <span class="count" id="count-ast">0</span></button>
+        <button class="tab" role="tab" id="tab-core" data-tab="core" type="button">Core <span class="count" id="count-core">0</span></button>
+        <button class="tab" role="tab" id="tab-js" data-tab="js" type="button">JavaScript <span class="count" id="count-js">0</span></button>
+        <button class="tab" role="tab" id="tab-run" data-tab="run" type="button">Run</button>
+      </div>
+    </div>
+    <div class="out" id="out"></div>
+  </section>
+</main>
+
+<footer>
+  This page runs the compiler's own <code>src/</code> modules in the browser. Positions are 1-based line:column+length;
+  the blue figure in the status bar is the same position converted to the 0-based form a source map stores.
+  Hover any row to see its span in the source. Under JavaScript, each underlined segment is one source-map entry.
+</footer>
+
+<script type="module">
+import { SourceFile } from '../src/source.js';
+import { Diagnostics, renderEntry } from '../src/diagnostics.js';
+import { lex } from '../src/lexer.js';
+import { parse } from '../src/parser.js';
+import { check } from '../src/checker.js';
+import { lower } from '../src/lower.js';
+import { optimize, mappingRetention } from '../src/optimize.js';
+import { emit } from '../src/emit.js';
+import { buildSourceMap } from '../src/sourcemap.js';
+import { CHILD_FIELDS } from '../src/ast.js';
+import { formatSpan, toMapPosition } from '../src/span.js';
+
+document.getElementById('boot').hidden = true;
+
+const EXAMPLES = [
+  { group: 'Benchmarks', path: 'examples/fib.tth' },
+  { group: 'Benchmarks', path: 'examples/primes.tth' },
+  { group: 'Benchmarks', path: 'examples/collatz.tth' },
+  { group: 'Benchmarks', path: 'examples/fizzbuzz.tth' },
+  { group: 'Error fixtures', path: 'test/fixtures/syntax-errors.tth' },
+  { group: 'Error fixtures', path: 'test/fixtures/lex-errors.tth' },
+  { group: 'Error fixtures', path: 'test/fixtures/semantic-errors.tth' },
+  { group: 'Optimisation', path: 'test/fixtures/optimisable.tth' },
+];
+
+const PHASES = [
+  { id: 'lex', name: 'Lex' },
+  { id: 'parse', name: 'Parse' },
+  { id: 'check', name: 'Check types' },
+  { id: 'lower', name: 'Lower' },
+  { id: 'emit', name: 'Emit JS' },
+  { id: 'map', name: 'Source map' },
+];
+
+const $ = (id) => document.getElementById(id);
+const ta = $('source');
+const hl = $('highlight');
+const gutter = $('gutter');
+const out = $('out');
+
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+let current = EXAMPLES[0];
+let originals = new Map();
+let tab = 'js';
+let result = null;
+let hover = null;    // span under the mouse in the output pane
+
+// ---- compile -----------------------------------------------------------------
+// The same phases, in the same order, as src/compiler.js. Each phase runs only
+// if the ones before it raised no error.
+
+function flatten(root) {
+  const nodes = [];
+  const visit = (node, depth, field) => {
+    nodes.push({ node, depth, field });
+    for (const f of CHILD_FIELDS[node.kind]) {
+      const v = node[f];
+      if (Array.isArray(v)) v.forEach((c) => visit(c, depth + 1, null));
+      else if (v) visit(v, depth + 1, f);
+    }
+  };
+  visit(root, 0, null);
+  return nodes;
+}
+
+function compile() {
+  const t0 = performance.now();
+  const fileName = current.path.split('/').pop();
+  const source = new SourceFile(current.path, ta.value);
+  const diags = new Diagnostics();
+  const tokens = lex(source, diags);
+  const lexErrors = diags.errorCount;
+  const ast = parse(tokens, diags);
+  const parseErrors = diags.errorCount - lexErrors;
+  let checkErrors = null;
+  let core = null;
+  let code = null;
+  let table = [];
+  let map = null;
+  let optimisation = null;
+  if (!diags.hasErrors()) {
+    check(ast, diags);
+    checkErrors = diags.errorCount;
+    if (!checkErrors) {
+      core = lower(ast);
+      if ($('optimise').checked) ({ program: core, stats: optimisation } = optimize(core));
+      const jsFile = fileName.replace(/\.tth$/, '') + '.js';
+      ({ code, mappings: table } = emit(core, { mapUrl: `${jsFile}.map` }));
+      map = buildSourceMap({ file: jsFile, source: fileName, sourceContent: ta.value, table });
+    }
+  }
+  const ms = performance.now() - t0;
+  result = {
+    source, diags, tokens, ast, nodes: flatten(ast), core, coreNodes: core ? flatten(core) : [],
+    code, table, map, lexErrors, parseErrors, checkErrors, ms, optimisation,
+    retention: code ? mappingRetention(ast, table) : null,
+  };
+}
+
+// ---- rendering ---------------------------------------------------------------
+
+function renderPhases() {
+  const r = result;
+  const phase = (cls, state) => ({ cls, state });
+  const states = {
+    lex: r.lexErrors ? phase('bad', plural(r.lexErrors, 'error')) : phase('ok', plural(r.tokens.length, 'token')),
+    parse: r.parseErrors ? phase('bad', plural(r.parseErrors, 'error')) : phase('ok', plural(r.nodes.length, 'node')),
+    check: r.checkErrors === null ? phase('todo', 'skipped') : r.checkErrors ? phase('bad', plural(r.checkErrors, 'error')) : phase('ok', 'types ok'),
+    lower: r.core ? phase('ok', plural(r.coreNodes.length, 'node') +
+      (r.optimisation ? ` · ${r.optimisation.folded} folded, ${r.optimisation.removed} removed` : '')) : phase('todo', '—'),
+    emit: r.code ? phase('ok', plural(r.code.split('\n').length - 1, 'line')) : phase('todo', '—'),
+    map: r.map ? phase('ok', plural(r.table.length, 'mapping')) : phase('todo', '—'),
+  };
+  $('phases').innerHTML = PHASES.map((p) =>
+    `<div class="phase ${states[p.id].cls}"><span class="name">${p.name}</span><span class="state">${states[p.id].state}</span></div>`).join('');
+}
+
+function label(node, core) {
+  switch (node.kind) {
+    case 'Ident': {
+      const js = core ? node.symbol?.jsName : null;
+      return js && js !== node.name ? `${node.name} ⇒ ${js}` : node.name;
+    }
+    case 'TypeRef': return node.name;
+    case 'IntLit': case 'BoolLit': return String(node.value);
+    case 'StringLit': return JSON.stringify(node.value);
+    case 'Binary': case 'Unary': case 'Assign': return node.op;
+    default: return '';
+  }
+}
+
+function treeRows(nodes, attr, core) {
+  return `<div class="ast">${nodes.map(({ node, depth, field }, i) =>
+    `<div class="row" ${attr}="${i}" style="--d:${depth}">` +
+    (field ? `<span class="field">${field}:</span>` : '') +
+    `<span class="kind">${node.kind}</span>` +
+    (label(node, core) ? `<span class="extra">${esc(label(node, core))}</span>` : '') +
+    (node.synthetic ? '<span class="badge">lowered</span>' : '') +
+    (node.folded ? '<span class="badge">folded</span>' : '') +
+    `<span class="sp">${formatSpan(node.span)}</span></div>`).join('')}</div>`;
+}
+
+// The caret block of one diagnostic entry, without its header line.
+function caretBlock(severity, message, span) {
+  if (!span) return '';
+  const lines = renderEntry(severity, message, span, result.source).split('\n');
+  return `<pre>${esc(lines.slice(1).join('\n')).replace(/(\^+)\s*$/, '<span class="caret">$1</span>')}</pre>`;
+}
+
+function renderJs() {
+  const r = result;
+  const byLine = new Map();
+  r.table.forEach((m, i) => {
+    if (!byLine.has(m.generatedLine)) byLine.set(m.generatedLine, []);
+    byLine.get(m.generatedLine).push(i);
+  });
+  const rows = r.code.replace(/\n$/, '').split('\n').map((text, line) => {
+    const idx = byLine.get(line) ?? [];
+    let html = '';
+    let pos = 0;
+    idx.forEach((i, k) => {
+      const start = r.table[i].generatedColumn;
+      const end = k + 1 < idx.length ? r.table[idx[k + 1]].generatedColumn : text.length;
+      html += esc(text.slice(pos, start));
+      html += `<span class="seg" data-m="${i}">${esc(text.slice(start, end))}</span>`;
+      pos = end;
+    });
+    html += esc(text.slice(pos));
+    return `<div class="jsline"><span class="ln">${line + 1}</span><span>${html}</span></div>`;
+  });
+  return `<div class="js">${rows.join('')}</div>`;
+}
+
+const NOT_YET = (what) => `<div class="clean waiting"><strong>${what} appears when the program has no errors.</strong>
+  <p>Fix the errors listed under Diagnostics first.</p></div>`;
+
+function renderOutput() {
+  const r = result;
+  const sorted = r.diags.sorted();
+  const errors = r.diags.errorCount;
+  $('count-diagnostics').textContent = errors;
+  $('count-diagnostics').classList.toggle('bad', errors > 0);
+  $('count-tokens').textContent = r.tokens.length;
+  $('count-ast').textContent = r.nodes.length;
+  $('count-core').textContent = r.coreNodes.length;
+  $('count-js').textContent = r.table.length;
+  for (const b of document.querySelectorAll('.tab')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+
+  if (tab === 'diagnostics') {
+    if (!sorted.length) {
+      out.innerHTML = `<div class="clean"><strong>No errors.</strong>
+        <p>Lexed, parsed, type-checked, lowered${r.optimisation ? ', optimised' : ''} and compiled to JavaScript in
+        ${r.ms.toFixed(1)} ms, with ${plural(r.table.length, 'source mapping')}.
+        ${r.retention.kept} of ${plural(r.retention.statements, 'source statement')} keep a mapping.</p></div>`;
+      return;
+    }
+    out.innerHTML = `<div class="diags">${sorted.map((d, i) => {
+      const loc = d.span ? `${d.span.line}:${d.span.col}` : '';
+      const notes = (d.notes ?? []).map((n, k) => `<div class="note-part" data-d="${i}" data-note="${k}">
+          <div class="diag-head note-head"><span class="loc">${n.span.line}:${n.span.col}</span>note: ${esc(n.message)}</div>
+          ${caretBlock('note', n.message, n.span)}</div>`).join('');
+      return `<div class="diag ${d.severity}" data-d="${i}">
+        <div class="diag-head"><span class="loc">${loc}</span>${d.severity}: ${esc(d.message)}</div>
+        ${caretBlock(d.severity, d.message, d.span)}${notes}
+      </div>`;
+    }).join('')}</div>`;
+    return;
+  }
+
+  if (tab === 'tokens') {
+    out.innerHTML = r.tokens.map((t, i) => `<div class="row" data-t="${i}">` +
+      `<span class="tok-pos">${t.span.line}:${t.span.col}</span>` +
+      `<span class="tok-kind k-${t.kind}">${t.kind}</span>` +
+      `<span class="k-${t.kind}">${t.kind === 'EOF' ? '&lt;end of file&gt;' : esc(t.lexeme)}</span>` +
+      `<span class="sp">+${t.span.length}</span></div>`).join('');
+    return;
+  }
+
+  if (tab === 'ast') {
+    out.innerHTML = treeRows(r.nodes, 'data-n', false);
+    return;
+  }
+
+  if (tab === 'core') {
+    out.innerHTML = r.core ? treeRows(r.coreNodes, 'data-c', true) : NOT_YET('The lowered core tree');
+    return;
+  }
+
+  if (tab === 'js') {
+    out.innerHTML = r.code ? renderJs() : NOT_YET('The generated JavaScript');
+    return;
+  }
+
+  // tab === 'run'
+  out.innerHTML = r.code
+    ? `<div class="run"><div class="run-bar"><button class="btn" id="run-btn" type="button">Run program</button>
+        <span class="hint">Runs the generated JavaScript in a worker and stops it after 2 seconds.</span></div>
+        <pre id="run-out"></pre></div>`
+    : NOT_YET('The Run button');
+}
+
+// The highlight layer: same text as the textarea, but transparent, with
+// marks for error spans (wavy underline) and the hovered span (filled).
+function paintSource() {
+  const text = ta.value;
+  const clamp = (n) => Math.max(0, Math.min(text.length, n));
+  const ranges = [];
+  for (const d of result.diags.items) {
+    if (d.span && d.severity === 'error') ranges.push({ s: clamp(d.span.offset), e: clamp(d.span.offset + d.span.length), cls: 'err' });
+  }
+  if (hover) ranges.push({ s: clamp(hover.offset), e: clamp(hover.offset + hover.length), cls: 'hl' });
+  const points = [...new Set([0, text.length, ...ranges.flatMap((r) => [r.s, r.e])])].sort((a, b) => a - b);
+  let html = '';
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    for (const r of ranges) if (r.s === r.e && r.s === p) html += `<span class="pt ${r.cls}"></span>`;
+    if (i + 1 < points.length) {
+      const q = points[i + 1];
+      const cls = ranges.filter((r) => r.s < r.e && r.s <= p && r.e >= q).map((r) => r.cls);
+      const seg = esc(text.slice(p, q));
+      html += cls.length ? `<mark class="${cls.join(' ')}">${seg}</mark>` : seg;
+    }
+  }
+  hl.innerHTML = html + '\n ';
+  const lines = result.source.lineCount;
+  let nums = '';
+  for (let i = 1; i <= lines; i++) nums += i + '\n';
+  gutter.textContent = nums;
+  syncScroll();
+}
+
+function syncScroll() {
+  hl.scrollTop = ta.scrollTop;
+  hl.scrollLeft = ta.scrollLeft;
+  gutter.scrollTop = ta.scrollTop;
+}
+
+// ---- running the program -------------------------------------------------------
+
+function runProgram() {
+  const pre = $('run-out');
+  if (!pre || !result.code) return;
+  pre.innerHTML = '';
+  const append = (text, cls = '') => { pre.insertAdjacentHTML('beforeend', `<span class="${cls}">${esc(text)}</span>\n`); };
+  const shim = 'console.log = (...a) => postMessage({ line: a.map(String).join(" ") });\n';
+  const blob = new Blob([shim, result.code, '\npostMessage({ done: true });\n'], { type: 'text/javascript' });
+  const url = URL.createObjectURL(blob);
+  const worker = new Worker(url);
+  const t0 = performance.now();
+  const stop = () => { clearTimeout(timer); worker.terminate(); URL.revokeObjectURL(url); };
+  const timer = setTimeout(() => { stop(); append('stopped after 2 seconds (an infinite loop?)', 'err'); }, 2000);
+  worker.onmessage = (e) => {
+    if (e.data.line !== undefined) append(e.data.line);
+    if (e.data.done) { stop(); append(`finished in ${(performance.now() - t0).toFixed(0)} ms`, 'muted'); }
+  };
+  worker.onerror = (e) => { e.preventDefault(); stop(); append(e.message, 'err'); };
+}
+
+// ---- cursor and span readout ----------------------------------------------------
+
+function position(offset) {
+  // Same rules as the lexer: \n, \r\n and a lone \r end a line; a tab is one column.
+  const before = ta.value.slice(0, offset).split(/\r\n|\r|\n/);
+  return { line: before.length, col: before[before.length - 1].length + 1 };
+}
+
+function describeSpan(span, what) {
+  const m = toMapPosition(span);
+  return `${what} <b>${formatSpan(span)}</b> <span class="map">→ map ${m.line}:${m.column}</span>`;
+}
+
+const contains = (s, offset) => offset >= s.offset && offset < s.offset + Math.max(1, s.length);
+
+function deepestAt(nodes, offset) {
+  let best = -1;
+  nodes.forEach(({ node }, i) => { if (contains(node.span, offset)) best = i; });
+  return best;
+}
+
+// The mapping whose span is the smallest one containing the offset.
+function mappingAt(offset) {
+  let best = -1;
+  result.table.forEach((m, i) => {
+    if (contains(m.span, offset) && (best < 0 || m.span.length <= result.table[best].span.length)) best = i;
+  });
+  return best;
+}
+
+function tokenAt(offset) {
+  return result.tokens.findIndex((t) => contains(t.span, offset));
+}
+
+function updateCursor() {
+  const off = ta.selectionStart;
+  const { line, col } = position(off);
+  $('cursor').innerHTML = `Ln <b>${line}</b>, Col <b>${col}</b>`;
+  for (const el of out.querySelectorAll('.current')) el.classList.remove('current');
+  let rows = [];
+  let info = null;
+  if (tab === 'ast' || tab === 'core') {
+    const nodes = tab === 'ast' ? result.nodes : result.coreNodes;
+    const i = deepestAt(nodes, off);
+    if (i >= 0) {
+      rows = [out.querySelector(`[data-${tab === 'ast' ? 'n' : 'c'}="${i}"]`)];
+      info = { span: nodes[i].node.span, what: nodes[i].node.kind };
+    }
+  } else if (tab === 'tokens') {
+    const i = tokenAt(off);
+    if (i >= 0) {
+      rows = [out.querySelector(`[data-t="${i}"]`)];
+      info = { span: result.tokens[i].span, what: result.tokens[i].kind };
+    }
+  } else if (tab === 'js') {
+    const i = mappingAt(off);
+    if (i >= 0) {
+      rows = [...out.querySelectorAll(`[data-m="${i}"]`)];
+      info = mappingInfo(i);
+    }
+  }
+  for (const row of rows.filter(Boolean)) {
+    row.classList.add('current');
+    row.scrollIntoView({ block: 'nearest' });
+  }
+  if (!hover) $('spaninfo').innerHTML = info ? describeSpan(info.span, info.what) : '';
+}
+
+function mappingInfo(i) {
+  const m = result.table[i];
+  return { span: m.span, what: `JS ${m.generatedLine}:${m.generatedColumn}${m.name ? ` (${esc(m.name)})` : ''} ←` };
+}
+
+function spanForRow(el) {
+  if (!el) return null;
+  const { n, t, c, m, d, note } = el.dataset;
+  if (n !== undefined) return { span: result.nodes[+n].node.span, what: result.nodes[+n].node.kind };
+  if (c !== undefined) return { span: result.coreNodes[+c].node.span, what: result.coreNodes[+c].node.kind };
+  if (t !== undefined) return { span: result.tokens[+t].span, what: result.tokens[+t].kind };
+  if (m !== undefined) return mappingInfo(+m);
+  if (d !== undefined) {
+    const diag = result.diags.sorted()[+d];
+    const span = note !== undefined ? diag.notes[+note].span : diag.span;
+    return span ? { span, what: note !== undefined ? 'note' : diag.severity } : null;
+  }
+  return null;
+}
+
+// ---- events ----------------------------------------------------------------------
+
+function refresh() {
+  compile();
+  renderPhases();
+  renderOutput();
+  paintSource();
+  updateCursor();
+}
+
+let timer = 0;
+ta.addEventListener('input', () => {
+  clearTimeout(timer);
+  timer = setTimeout(refresh, 120);
+});
+ta.addEventListener('scroll', syncScroll);
+for (const ev of ['keyup', 'click', 'select']) ta.addEventListener(ev, updateCursor);
+ta.addEventListener('keydown', (e) => {
+  // Tab inserts a tab character instead of leaving the editor.
+  if (e.key === 'Tab' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    e.preventDefault();
+    const { selectionStart: s, selectionEnd: f } = ta;
+    ta.setRangeText('\t', s, f, 'end');
+    ta.dispatchEvent(new Event('input'));
+  }
+});
+
+const ROW = '[data-note],[data-n],[data-t],[data-d],[data-c],[data-m]';
+out.addEventListener('mouseover', (e) => {
+  const info = spanForRow(e.target.closest(ROW));
+  const next = info ? info.span : null;
+  if (next === hover) return;
+  hover = next;
+  paintSource();
+  $('spaninfo').innerHTML = info ? describeSpan(info.span, info.what) : '';
+});
+out.addEventListener('mouseleave', () => {
+  hover = null;
+  paintSource();
+  updateCursor();
+});
+out.addEventListener('click', (e) => {
+  if (e.target.id === 'run-btn') {
+    runProgram();
+    return;
+  }
+  const info = spanForRow(e.target.closest(ROW));
+  if (!info) return;
+  const { offset, length, line } = info.span;
+  ta.focus({ preventScroll: true });
+  ta.setSelectionRange(offset, offset + length);
+  const lineHeight = parseFloat(getComputedStyle(ta).lineHeight);
+  const top = (line - 1) * lineHeight;
+  if (top < ta.scrollTop || top > ta.scrollTop + ta.clientHeight - 2 * lineHeight) {
+    ta.scrollTop = Math.max(0, top - ta.clientHeight / 3);
+  }
+  updateCursor();
+});
+
+for (const b of document.querySelectorAll('.tab')) {
+  b.addEventListener('click', () => {
+    tab = b.dataset.tab;
+    renderOutput();
+    updateCursor();
+  });
+}
+
+const select = $('example');
+const groups = [...new Set(EXAMPLES.map((e) => e.group))];
+select.innerHTML = groups.map((g) => `<optgroup label="${g}">${EXAMPLES.filter((e) => e.group === g)
+  .map((e) => `<option value="${e.path}">${e.path.split('/').pop()}</option>`).join('')}</optgroup>`).join('');
+
+async function load(path, { keepTab = false } = {}) {
+  current = EXAMPLES.find((e) => e.path === path);
+  if (!originals.has(path)) {
+    const res = await fetch(`../${path}`);
+    if (!res.ok) throw new Error(`could not load ${path} (HTTP ${res.status})`);
+    originals.set(path, await res.text());
+  }
+  ta.value = originals.get(path);
+  ta.scrollTop = 0;
+  ta.setSelectionRange(0, 0);
+  $('filename').textContent = path;
+  hover = null;
+  compile();
+  if (!keepTab) tab = result.diags.hasErrors() ? 'diagnostics' : 'js';
+  refresh();
+}
+
+// #fib, #syntax-errors, ... open that program directly, which is handy for a demo.
+const fromHash = () => EXAMPLES.find((e) => location.hash === `#${e.path.split('/').pop().replace('.tth', '')}`);
+select.addEventListener('change', () => {
+  history.replaceState(null, '', `#${select.value.split('/').pop().replace('.tth', '')}`);
+  load(select.value);
+});
+window.addEventListener('hashchange', () => {
+  const e = fromHash();
+  if (e) { select.value = e.path; load(e.path); }
+});
+$('reset').addEventListener('click', () => load(current.path, { keepTab: true }));
+$('optimise').addEventListener('change', refresh);
+
+const first = fromHash() ?? EXAMPLES[0];
+select.value = first.path;
+load(first.path).catch((err) => {
+  out.innerHTML = `<div class="diags"><div class="diag"><div class="diag-head">${esc(String(err.message))}</div></div></div>`;
+});
+</script>
+</body>
+</html>

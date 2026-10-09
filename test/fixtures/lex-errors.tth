@@ -1,0 +1,5 @@
+let s = "never closed;
+let t = "bad \q escape";
+let u = 1 & 2;
+let v = 99999999999999999999;
+	let w = #;

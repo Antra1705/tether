@@ -1,0 +1,34 @@
+test/fixtures/semantic-errors.tth:9:4: error: function 'sign' does not return a value on every path
+  9 | fn sign(n: int): int {
+    |    ^^^^
+test/fixtures/semantic-errors.tth:9:18: note: its return type is 'int'
+  9 | fn sign(n: int): int {
+    |                  ^^^
+test/fixtures/semantic-errors.tth:15:14: error: 'x' is declared 'int', but is initialised with 'bool'
+  15 | let x: int = true;
+     |              ^^^^
+test/fixtures/semantic-errors.tth:16:5: error: 'x' is already declared in this scope
+  16 | let x = 2;
+     |     ^
+test/fixtures/semantic-errors.tth:15:5: note: previous declaration of 'x' is here
+  15 | let x: int = true;
+     |     ^
+test/fixtures/semantic-errors.tth:17:5: error: 'if' condition must be 'bool', found 'int'
+  17 | if (x) {
+     |     ^
+test/fixtures/semantic-errors.tth:20:7: error: 'add' expects 2 arguments, but got 1
+  20 | print(add(1));
+     |       ^^^^^^
+test/fixtures/semantic-errors.tth:5:4: note: 'add' is declared here
+  5 | fn add(a: int, b: int): int {
+    |    ^^^
+test/fixtures/semantic-errors.tth:21:14: error: argument 2 of 'add' must be 'int', found 'string'
+  21 | print(add(1, "two"));
+     |              ^^^^^
+test/fixtures/semantic-errors.tth:22:7: error: unknown variable 'total'
+  22 | print(total + 1);
+     |       ^^^^^
+test/fixtures/semantic-errors.tth:23:7: error: operator '+' cannot be applied to 'int' and 'string'
+  23 | print(1 + "one");
+     |       ^^^^^^^^^
+8 errors; no output written

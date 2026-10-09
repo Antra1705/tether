@@ -1,0 +1,23 @@
+// Constant expressions and dead code, to show what -O1 does and how many
+// statements lose their mapping (--map-report).
+
+fn area(w: int, h: int): int {
+  return w * h;
+  print("unreachable");
+}
+
+let secondsPerDay = 24 * 60 * 60;
+if (1 > 2) {
+  print("never");
+}
+while (false) {
+  print("never either");
+}
+if (true && 3 < 4) {
+  print("always");
+} else {
+  print("never");
+}
+print(secondsPerDay);
+print(area(2, 3) + 10 / 3);
+print("tether" + "-" + "o1");

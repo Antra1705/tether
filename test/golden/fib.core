@@ -1,0 +1,85 @@
+Program @3:1+318
+  FnDecl @3:1+90
+    name: Ident fib @3:4+3
+    Param @3:8+6
+      name: Ident n @3:8+1
+    body: Block @3:21+70
+      If @4:3+30
+        cond: Binary < @4:7+5
+          left: Ident n @4:7+1
+          right: IntLit 2 @4:11+1
+        then: Block @4:14+19
+          Return @5:5+9
+            value: Ident n @5:12+1
+      Return @7:3+31
+        value: Binary + @7:10+23
+          left: Call @7:10+10
+            callee: Ident fib @7:10+3
+            Binary - @7:14+5
+              left: Ident n @7:14+1
+              right: IntLit 1 @7:18+1
+          right: Call @7:23+10
+            callee: Ident fib @7:23+3
+            Binary - @7:27+5
+              left: Ident n @7:27+1
+              right: IntLit 2 @7:31+1
+  FnDecl @10:1+151
+    name: Ident fibIter @10:4+7
+    Param @10:12+6
+      name: Ident n @10:12+1
+    body: Block @10:25+127
+      Let @11:3+10
+        name: Ident a @11:7+1
+        init: IntLit 0 @11:11+1
+      Let @12:3+10
+        name: Ident b @12:7+1
+        init: IntLit 1 @12:11+1
+      Block @13:3+83 [lowered]
+        Let @13:8+9
+          name: Ident i @13:12+1
+          init: IntLit 0 @13:16+1
+        While @13:3+83 [lowered]
+          cond: Binary < @13:19+5
+            left: Ident i @13:19+1
+            right: Ident n @13:23+1
+          body: Block @13:34+52
+            Let @14:5+17
+              name: Ident next @14:9+4
+              init: Binary + @14:16+5
+                left: Ident a @14:16+1
+                right: Ident b @14:20+1
+            Assign = @15:5+6
+              target: Ident a @15:5+1
+              value: Ident b @15:9+1
+            Assign = @16:5+9
+              target: Ident b @16:5+1
+              value: Ident next @16:9+4
+            Assign = @13:26+6 [lowered]
+              target: Ident i @13:26+1
+              value: Binary + @13:26+6 [lowered]
+                left: Ident i @13:26+1
+                right: IntLit 1 @13:31+1
+      Return @18:3+9
+        value: Ident a @18:10+1
+  Block @21:1+53 [lowered]
+    Let @21:6+9
+      name: Ident i @21:10+1
+      init: IntLit 0 @21:14+1
+    While @21:1+53 [lowered]
+      cond: Binary <= @21:17+7
+        left: Ident i @21:17+1
+        right: IntLit 15 @21:22+2
+      body: Block @21:34+20
+        Print @22:3+14
+          value: Call @22:9+6
+            callee: Ident fib @22:9+3
+            Ident i @22:13+1
+        Assign = @21:26+6 [lowered]
+          target: Ident i @21:26+1
+          value: Binary + @21:26+6 [lowered]
+            left: Ident i @21:26+1
+            right: IntLit 1 @21:31+1
+  Print @24:1+19
+    value: Call @24:7+11
+      callee: Ident fibIter @24:7+7
+      IntLit 40 @24:15+2

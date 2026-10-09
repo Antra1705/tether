@@ -1,0 +1,24 @@
+// Fibonacci, computed recursively and iteratively.
+
+fn fib(n: int): int {
+  if (n < 2) {
+    return n;
+  }
+  return fib(n - 1) + fib(n - 2);
+}
+
+fn fibIter(n: int): int {
+  let a = 0;
+  let b = 1;
+  for (let i = 0; i < n; i += 1) {
+    let next = a + b;
+    a = b;
+    b = next;
+  }
+  return a;
+}
+
+for (let i = 0; i <= 15; i += 1) {
+  print(fib(i));
+}
+print(fibIter(40));

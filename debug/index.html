@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tether Debug Harness</title>
+<style>
+  /* A plain page that runs one compiled program, so that Chrome DevTools can
+     debug it through its source map (milestone 7). */
+  :root {
+    --bg: #ffffff; --fg: #18202c; --muted: #5b6779; --line: #dde2ea; --sunken: #f5f7fa;
+    --accent: #2f5bd3; --err: #c42b3a;
+    --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-code: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1218; --fg: #e3e8ef; --muted: #8b97a9; --line: #263040; --sunken: #151a22;
+      --accent: #7fa3ff; --err: #ff6b78; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1218; --fg: #e3e8ef; --muted: #8b97a9; --line: #263040; --sunken: #151a22;
+    --accent: #7fa3ff; --err: #ff6b78; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--font-ui); }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { margin: 0 0 12px; color: var(--muted); }
+  nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  nav a {
+    padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--fg);
+    text-decoration: none; font-family: var(--font-code); font-size: 13px;
+  }
+  nav a[aria-current="page"] { border-color: var(--accent); color: var(--accent); }
+  code { font-family: var(--font-code); }
+  pre {
+    margin: 0; padding: 12px 14px; min-height: 120px; overflow-x: auto; white-space: pre-wrap;
+    background: var(--sunken); border: 1px solid var(--line); border-radius: 8px;
+    font: 13px/20px var(--font-code);
+  }
+  .err { color: var(--err); }
+  ol { padding-left: 20px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tether debug harness</h1>
+  <p>Runs <code id="file"></code>, compiled by <code>npm run build:examples</code>, as an ordinary script.</p>
+  <nav id="programs" aria-label="Programs"></nav>
+  <pre id="output" aria-live="polite"></pre>
+  <ol>
+    <li>Open Chrome DevTools (⌥⌘I or F12) and choose <b>Sources</b>.</li>
+    <li>Open the <code>.tth</code> file under <code>localhost</code> → <code>examples</code>. It comes from the source map.</li>
+    <li>Click a line number in the <code>.tth</code> file to set a breakpoint, then reload this page.</li>
+  </ol>
+</main>
+<script>
+  // Plain script, not a module: the compiled program runs exactly as it
+  // would on any web page. console.log still goes to the DevTools console,
+  // and is also copied onto the page.
+  (function () {
+    var programs = ['fib', 'primes', 'collatz', 'fizzbuzz', 'stack-overflow'];
+    var params = new URLSearchParams(location.search);
+    var name = programs.indexOf(params.get('program')) >= 0 ? params.get('program') : 'fib';
+    document.getElementById('file').textContent = 'out/' + name + '.js';
+    document.title = name + '.tth — Tether Debug Harness';
+    document.getElementById('programs').innerHTML = programs.map(function (p) {
+      return '<a href="?program=' + p + '"' + (p === name ? ' aria-current="page"' : '') + '>' + p + '.tth</a>';
+    }).join('');
+
+    var output = document.getElementById('output');
+    var log = console.log.bind(console);
+    console.log = function () {
+      log.apply(console, arguments);
+      output.textContent += Array.prototype.join.call(arguments, ' ') + '\n';
+    };
+    window.addEventListener('error', function (e) {
+      var line = document.createElement('span');
+      line.className = 'err';
+      line.textContent = 'Uncaught ' + e.message + '  (see the DevTools console for the stack trace)\n';
+      output.appendChild(line);
+    });
+
+    var script = document.createElement('script');
+    script.src = '../out/' + name + '.js';
+    script.onerror = function () {
+      output.innerHTML = '<span class="err">Could not load out/' + name + '.js. Run npm run build:examples first.</span>';
+    };
+    document.body.appendChild(script);
+  })();
+</script>
+</body>
+</html>

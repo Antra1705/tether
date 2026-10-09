@@ -1,0 +1,25 @@
+// Primes below 100 by trial division.
+
+fn isPrime(n: int): bool {
+  if (n < 2) {
+    return false;
+  }
+  let d = 2;
+  while (d * d <= n) {
+    if (n % d == 0) {
+      return false;
+    }
+    d += 1;
+  }
+  return true;
+}
+
+let count = 0;
+for (let n = 2; n < 100; n += 1) {
+  if (isPrime(n)) {
+    print(n);
+    count += 1;
+  }
+}
+print("primes below 100:");
+print(count);

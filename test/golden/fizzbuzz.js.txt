@@ -1,0 +1,28 @@
+"use strict";
+function divides(d, n) {
+  return n % d === 0;
+}
+function isPlain(n) {
+  return !(divides(3, n) ? true : divides(5, n));
+}
+function fizzbuzz(n) {
+  let var$ = "";
+  if (divides(3, n) ? divides(5, n) : false) {
+    var$ = "FizzBuzz";
+  } else if (divides(3, n)) {
+    var$ = "Fizz";
+  } else if (divides(5, n)) {
+    var$ = "Buzz";
+  }
+  return var$;
+}
+let i = 1;
+while (i <= 30) {
+  if (isPlain(i)) {
+    console.log(i);
+  } else {
+    console.log(fizzbuzz(i));
+  }
+  i = i + 1;
+}
+//# sourceMappingURL=fizzbuzz.js.map

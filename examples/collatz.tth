@@ -1,0 +1,28 @@
+// The starting value below a limit with the longest Collatz chain.
+
+fn collatzLength(start: int): int {
+  let n = start;
+  let steps = 1;
+  while (n != 1) {
+    if (n % 2 == 0) {
+      n = n / 2;
+    } else {
+      n = 3 * n + 1;
+    }
+    steps += 1;
+  }
+  return steps;
+}
+
+let limit: int = 10000;
+let best = 1;
+let bestLength = 1;
+for (let i = 1; i < limit; i += 1) {
+  let length = collatzLength(i);
+  if (length > bestLength) {
+    best = i;
+    bestLength = length;
+  }
+}
+print(best);
+print(bestLength);

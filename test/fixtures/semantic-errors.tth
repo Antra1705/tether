@@ -1,0 +1,23 @@
+// Eight independent semantic errors (AC-4 needs at least five). The checker
+// should report every one in a single run, each with its caret, and no
+// follow-on errors.
+
+fn add(a: int, b: int): int {
+  return a + b;
+}
+
+fn sign(n: int): int {
+  if (n > 0) {
+    return 1;
+  }
+}
+
+let x: int = true;
+let x = 2;
+if (x) {
+  print(x);
+}
+print(add(1));
+print(add(1, "two"));
+print(total + 1);
+print(1 + "one");

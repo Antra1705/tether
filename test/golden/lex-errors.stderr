@@ -1,0 +1,16 @@
+test/fixtures/lex-errors.tth:1:9: error: unterminated string literal
+  1 | let s = "never closed;
+    |         ^
+test/fixtures/lex-errors.tth:2:14: error: unknown escape sequence '\q'
+  2 | let t = "bad \q escape";
+    |              ^^
+test/fixtures/lex-errors.tth:3:11: error: unexpected character '&'; did you mean '&&'?
+  3 | let u = 1 & 2;
+    |           ^
+test/fixtures/lex-errors.tth:4:9: error: integer literal is too large
+  4 | let v = 99999999999999999999;
+    |         ^^^^^^^^^^^^^^^^^^^^
+test/fixtures/lex-errors.tth:5:10: error: unexpected character '#'
+  5 | 	let w = #;
+    | 	        ^
+5 errors; no output written

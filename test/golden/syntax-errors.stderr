@@ -1,0 +1,22 @@
+test/fixtures/syntax-errors.tth:4:18: error: expected ':' after parameter 'b', found keyword 'int'
+  4 | fn add(a: int, b int): int {
+    |                  ^^^
+test/fixtures/syntax-errors.tth:8:13: error: expected an expression, found ';'
+  8 | let x = 1 + ;
+    |             ^
+test/fixtures/syntax-errors.tth:9:9: error: expected ';' after print statement, found keyword 'let'
+  9 | print(x)
+    |         ^
+test/fixtures/syntax-errors.tth:10:15: error: expected ')' to close the parenthesised expression, found ';'
+  10 | let z = (2 * 3;
+     |               ^
+test/fixtures/syntax-errors.tth:11:4: error: expected '(' after 'if', found identifier 'x'
+  11 | if x < 3 {
+     |    ^
+test/fixtures/syntax-errors.tth:14:14: error: expected ')' after while condition, found '{'
+  14 | while (z > 0 {
+     |              ^
+test/fixtures/syntax-errors.tth:17:5: error: expected variable name after 'let', found '='
+  17 | let = 4;
+     |     ^
+7 errors; no output written

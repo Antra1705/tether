@@ -1,0 +1,22 @@
+{
+  "name": "tether",
+  "version": "1.0.0",
+  "description": "A source-mapped transpiler for a small statically typed language, targeting ECMAScript 2015",
+  "type": "module",
+  "bin": {
+    "tether": "bin/tether.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "test:update-golden": "TETHER_UPDATE_GOLDEN=1 node --test",
+    "build:examples": "node scripts/build-examples.js",
+    "playground": "node scripts/serve.js",
+    "map-report": "node scripts/map-report.js",
+    "verify:browser": "node scripts/verify-browser.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

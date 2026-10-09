@@ -1,0 +1,30 @@
+"use strict";
+function fib(n) {
+  if (n < 2) {
+    return n;
+  }
+  return fib(n - 1) + fib(n - 2);
+}
+function fibIter(n) {
+  let a = 0;
+  let b = 1;
+  {
+    let i = 0;
+    while (i < n) {
+      let next = a + b;
+      a = b;
+      b = next;
+      i = i + 1;
+    }
+  }
+  return a;
+}
+{
+  let i = 0;
+  while (i <= 15) {
+    console.log(fib(i));
+    i = i + 1;
+  }
+}
+console.log(fibIter(40));
+//# sourceMappingURL=fib.js.map

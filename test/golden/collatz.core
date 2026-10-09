@@ -1,0 +1,87 @@
+Program @3:1+440
+  FnDecl @3:1+205
+    name: Ident collatzLength @3:4+13
+    Param @3:18+10
+      name: Ident start @3:18+5
+    body: Block @3:35+171
+      Let @4:3+14
+        name: Ident n @4:7+1
+        init: Ident start @4:11+5
+      Let @5:3+14
+        name: Ident steps @5:7+5
+        init: IntLit 1 @5:15+1
+      While @6:3+115
+        cond: Binary != @6:10+6
+          left: Ident n @6:10+1
+          right: IntLit 1 @6:15+1
+        body: Block @6:18+100
+          If @7:5+74
+            cond: Binary == @7:9+10
+              left: Binary % @7:9+5
+                left: Ident n @7:9+1
+                right: IntLit 2 @7:13+1
+              right: IntLit 0 @7:18+1
+            then: Block @7:21+24
+              Assign = @8:7+10
+                target: Ident n @8:7+1
+                value: Binary / @8:11+5
+                  left: Ident n @8:11+1
+                  right: IntLit 2 @8:15+1
+            else: Block @9:12+28
+              Assign = @10:7+14
+                target: Ident n @10:7+1
+                value: Binary + @10:11+9
+                  left: Binary * @10:11+5
+                    left: IntLit 3 @10:11+1
+                    right: Ident n @10:15+1
+                  right: IntLit 1 @10:19+1
+          Assign = @12:5+11 [lowered]
+            target: Ident steps @12:5+5
+            value: Binary + @12:5+11 [lowered]
+              left: Ident steps @12:5+5
+              right: IntLit 1 @12:14+1
+      Return @14:3+13
+        value: Ident steps @14:10+5
+  Let @17:1+23
+    name: Ident limit @17:5+5
+    init: IntLit 10000 @17:18+5
+  Let @18:1+13
+    name: Ident best @18:5+4
+    init: IntLit 1 @18:12+1
+  Let @19:1+19
+    name: Ident bestLength @19:5+10
+    init: IntLit 1 @19:18+1
+  Block @20:1+143 [lowered]
+    Let @20:6+9
+      name: Ident i @20:10+1
+      init: IntLit 1 @20:14+1
+    While @20:1+143 [lowered]
+      cond: Binary < @20:17+9
+        left: Ident i @20:17+1
+        right: Ident limit @20:21+5
+      body: Block @20:36+108
+        Let @21:3+30
+          name: Ident length @21:7+6
+          init: Call @21:16+16
+            callee: Ident collatzLength @21:16+13
+            Ident i @21:30+1
+        If @22:3+69
+          cond: Binary > @22:7+19
+            left: Ident length @22:7+6
+            right: Ident bestLength @22:16+10
+          then: Block @22:28+44
+            Assign = @23:5+9
+              target: Ident best @23:5+4
+              value: Ident i @23:12+1
+            Assign = @24:5+20
+              target: Ident bestLength @24:5+10
+              value: Ident length @24:18+6
+        Assign = @20:28+6 [lowered]
+          target: Ident i @20:28+1
+          value: Binary + @20:28+6 [lowered]
+            left: Ident i @20:28+1
+            right: IntLit 1 @20:33+1
+  Print @27:1+12
+    value: Ident best @27:7+4
+  Print @28:1+18
+    value: Ident bestLength @28:7+10
