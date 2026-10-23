@@ -4,249 +4,334 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tether Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:ital,wght@0,400;0,600;1,400&display=swap">
 <style>
-  /* Layout: a compiler workbench. A phase strip across the top, the source on
-     the left, and the selected phase's output on the right. Hovering any
-     output row lights up its span in the source. */
+  /* Layout: a compiler workbench. The pipeline across the top, the source on
+     the left, the selected phase's output on the right, a status bar below.
+     Amber always means "linked position": hovering any output row lights up
+     its span in the source. The fonts are optional; without a network the
+     system fonts are used. */
   :root {
-    --bg: #f3f5f8;
+    --bg: #f6f6f4;
     --panel: #ffffff;
-    --sunken: #f7f8fb;
-    --fg: #18202c;
-    --muted: #5b6779;
-    --line: #dde2ea;
-    --accent: #2f5bd3;
-    --accent-soft: #e6ecfb;
-    --lit: #9a5b00;
-    --hl: rgba(255, 184, 48, 0.42);
-    --err: #c42b3a;
-    --err-soft: #fbe9eb;
-    --ok: #1d7f48;
-    --ok-soft: #e3f4ea;
-    --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    --font-code: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --raised: #fafaf8;
+    --sunken: #f1f1ee;
+    --fg: #1b1c1e;
+    --fg-2: #3c3f44;
+    --muted: #666a71;
+    --line: #e4e4e0;
+    --line-2: #d0d0cb;
+    --accent: #a35f08;
+    --accent-bg: #f0b54a;
+    --accent-ink: #1a1305;
+    --accent-soft: rgba(240, 170, 60, 0.12);
+    --lk: rgba(245, 175, 50, 0.38);
+    --lk-edge: rgba(190, 120, 10, 0.55);
+    --sel: rgba(245, 175, 50, 0.28);
+    --err: #c2302e;
+    --err-soft: rgba(194, 48, 46, 0.06);
+    --ok: #1f8a4c;
+    --s-kw: #1f4fbf;
+    --s-ty: #0b7a6e;
+    --s-fn: #6b3fb8;
+    --s-str: #2b7a2b;
+    --s-num: #ad4a10;
+    --s-com: #858890;
+    --s-pun: #5c6066;
+    --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-code: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     --code-size: 13px;
     --code-line: 20px;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #0e1218; --panel: #151a22; --sunken: #11161d; --fg: #e3e8ef; --muted: #8b97a9;
-      --line: #263040; --accent: #7fa3ff; --accent-soft: #1c2740; --lit: #e0a84f;
-      --hl: rgba(255, 184, 48, 0.30); --err: #ff6b78; --err-soft: #34181d; --ok: #4fc483; --ok-soft: #142a1f;
+      --bg: #0f1012; --panel: #141518; --raised: #18191d; --sunken: #0c0d0f;
+      --fg: #e4e4e2; --fg-2: #b6b8bc; --muted: #868a91; --line: #25272c; --line-2: #34373d;
+      --accent: #f0b54a; --accent-soft: rgba(240, 181, 74, 0.09);
+      --lk: rgba(240, 181, 74, 0.26); --lk-edge: rgba(240, 181, 74, 0.65); --sel: rgba(240, 181, 74, 0.22);
+      --err: #ff6f6b; --err-soft: rgba(255, 111, 107, 0.07); --ok: #5cc98a;
+      --s-kw: #8ab4f8; --s-ty: #5fcfc0; --s-fn: #c6a8f2; --s-str: #a7d58c; --s-num: #f2a072;
+      --s-com: #6f737b; --s-pun: #9a9ea6;
       color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #0e1218; --panel: #151a22; --sunken: #11161d; --fg: #e3e8ef; --muted: #8b97a9;
-    --line: #263040; --accent: #7fa3ff; --accent-soft: #1c2740; --lit: #e0a84f;
-    --hl: rgba(255, 184, 48, 0.30); --err: #ff6b78; --err-soft: #34181d; --ok: #4fc483; --ok-soft: #142a1f;
+    --bg: #0f1012; --panel: #141518; --raised: #18191d; --sunken: #0c0d0f;
+    --fg: #e4e4e2; --fg-2: #b6b8bc; --muted: #868a91; --line: #25272c; --line-2: #34373d;
+    --accent: #f0b54a; --accent-soft: rgba(240, 181, 74, 0.09);
+    --lk: rgba(240, 181, 74, 0.26); --lk-edge: rgba(240, 181, 74, 0.65); --sel: rgba(240, 181, 74, 0.22);
+    --err: #ff6f6b; --err-soft: rgba(255, 111, 107, 0.07); --ok: #5cc98a;
+    --s-kw: #8ab4f8; --s-ty: #5fcfc0; --s-fn: #c6a8f2; --s-str: #a7d58c; --s-num: #f2a072;
+    --s-com: #6f737b; --s-pun: #9a9ea6;
     color-scheme: dark;
   }
 
   * { box-sizing: border-box; }
+  /* Code must read exactly as written: no `<=` drawn as a single glyph. The `font`
+     shorthand resets this property, so it has to win over every rule. */
+  * { font-variant-ligatures: none !important; }
   html, body { height: 100%; }
   body {
     margin: 0; background: var(--bg); color: var(--fg);
     font: 14px/1.5 var(--font-ui);
-    display: flex; flex-direction: column;
+    display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto;
+    -webkit-font-smoothing: antialiased;
   }
-  button, select { font: inherit; color: inherit; }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button, select, input { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  [hidden] { display: none !important; }
 
   .boot {
-    margin: 16px; padding: 12px 16px; border: 1px solid var(--err); background: var(--err-soft);
-    border-radius: 6px;
+    grid-row: 1 / -1; margin: 24px; padding: 14px 16px; align-self: start;
+    border-left: 3px solid var(--err); background: var(--err-soft);
   }
   .boot code { font-family: var(--font-code); }
 
-  header {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px;
-    padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel);
+  /* Syntax colours, shared by the editor, tokens and generated JavaScript */
+  .kw { color: var(--s-kw); }
+  .ty { color: var(--s-ty); }
+  .fn { color: var(--s-fn); }
+  .str { color: var(--s-str); }
+  .num, .lit { color: var(--s-num); }
+  .com { color: var(--s-com); font-style: italic; }
+  .pun { color: var(--s-pun); }
+  .bad { color: var(--err); }
+
+  /* Top bar */
+  .top {
+    display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px 8px;
+    min-height: 48px; padding: 6px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
   }
-  .brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-right: auto; }
-  .brand h1 { margin: 0; font-size: 18px; letter-spacing: -0.01em; }
-  .brand p { margin: 0; color: var(--muted); font-size: 13px; }
-  .controls { display: flex; gap: 8px; align-items: center; }
-  .controls label { color: var(--muted); font-size: 13px; }
-  .controls .opt { display: flex; align-items: center; gap: 6px; color: var(--fg); font-family: var(--font-code); cursor: pointer; }
+  .brand { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; justify-self: start; }
+  .logo { width: 22px; height: 22px; flex: none; }
+  .logo circle { fill: var(--accent); }
+  .logo path { fill: none; stroke: var(--fg); stroke-width: 1.6; stroke-linecap: round; }
+  .word { font: 600 15px/1 var(--font-code); letter-spacing: -0.02em; }
+  .sub { font-size: 13px; color: var(--muted); padding-left: 10px; border-left: 1px solid var(--line-2); line-height: 16px; }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .controls > label[for] { font-size: 12px; color: var(--muted); }
   select, .btn {
-    height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px;
-    background: var(--sunken); cursor: pointer;
+    height: 30px; padding: 0 10px; border: 1px solid var(--line-2); border-radius: 4px;
+    background: var(--raised); cursor: pointer;
   }
-  .btn:hover, select:hover { border-color: var(--accent); }
+  select { font-family: var(--font-code); font-size: 12.5px; max-width: 46vw; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .btn:hover, select:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--accent-bg); border-color: var(--accent-bg); color: var(--accent-ink); font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn.icon { width: 30px; padding: 0; justify-content: center; }
+  .btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* Phase strip */
+  .opt {
+    display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px 0 8px;
+    border: 1px solid var(--line-2); border-radius: 4px; cursor: pointer; font: 12.5px var(--font-code);
+  }
+  .opt input {
+    appearance: none; margin: 0; width: 26px; height: 15px; border-radius: 8px; position: relative; cursor: pointer;
+    background: var(--line-2);
+  }
+  .opt input::before {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%;
+    background: var(--panel);
+  }
+  .opt input:checked { background: var(--accent-bg); }
+  .opt input:checked::before { left: 13px; background: var(--accent-ink); }
+  .opt input:focus-visible { outline-offset: 2px; }
+  .opt:has(input:checked) { border-color: var(--accent-bg); }
+
+  /* Pipeline: one step per compiler phase, each opens its output */
   .phases {
-    display: flex; gap: 0; overflow-x: auto; padding: 12px 20px;
-    border-bottom: 1px solid var(--line); background: var(--panel);
+    display: flex; overflow-x: auto; background: var(--panel); border-bottom: 1px solid var(--line);
+    scrollbar-width: none;
   }
+  .phases::-webkit-scrollbar { display: none; }
   .phase {
-    flex: 1 0 128px; display: flex; flex-direction: column; gap: 2px;
-    padding: 8px 12px; border: 1px solid var(--line); margin-left: -1px; background: var(--sunken);
+    flex: 1 0 auto; position: relative; display: grid; grid-template-columns: auto 1fr; column-gap: 8px;
+    padding: 8px 28px 9px 16px; border: 0; background: none; text-align: left; cursor: pointer;
   }
-  .phase:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
-  .phase:last-child { border-radius: 0 6px 6px 0; }
-  .phase .name { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
-  .phase .state { font-size: 13px; font-variant-numeric: tabular-nums; }
-  .phase.ok { background: var(--ok-soft); }
-  .phase.ok .state { color: var(--ok); font-weight: 600; }
-  .phase.bad { background: var(--err-soft); }
+  .phase + .phase::before {
+    content: ""; position: absolute; left: -5px; top: 50%; width: 8px; height: 8px; margin-top: -4px;
+    border-top: 1px solid var(--line-2); border-right: 1px solid var(--line-2); transform: rotate(45deg);
+  }
+  .phase:hover { background: var(--raised); }
+  .phase[aria-current="true"] { box-shadow: inset 0 -2px 0 var(--accent); }
+  .phase .idx { grid-row: span 2; font: 11px/18px var(--font-code); color: var(--muted); }
+  .phase .name { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--fg-2); }
+  .phase .state { font: 12px/18px var(--font-code); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .dot { width: 7px; height: 7px; flex: none; display: inline-block; border: 1.5px solid var(--line-2); border-radius: 1px; }
+  .dot.ok { background: var(--ok); border-color: var(--ok); }
+  .dot.bad { background: var(--err); border-color: var(--err); }
+  .phase.ok .state { color: var(--fg); }
   .phase.bad .state { color: var(--err); font-weight: 600; }
-  .phase.todo .state { color: var(--muted); }
 
-  main {
-    flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 16px; padding: 16px 20px;
-  }
-  .pane {
-    min-width: 0; min-height: 0; display: flex; flex-direction: column;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
-  }
+  /* Panes */
+  main { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--panel); }
+  .pane + .pane { border-left: 1px solid var(--line); }
   .pane-head {
-    display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 12px;
-    border-bottom: 1px solid var(--line);
+    flex: none; display: flex; align-items: stretch; gap: 8px; height: 36px; padding: 0 12px 0 0;
+    background: var(--raised); border-bottom: 1px solid var(--line);
   }
-  .pane-head .file { font-family: var(--font-code); font-size: 12.5px; color: var(--muted); }
+  .file {
+    display: flex; align-items: center; gap: 8px; padding: 0 14px; background: var(--panel);
+    border-right: 1px solid var(--line); margin-bottom: -1px; font: 12.5px var(--font-code); color: var(--fg-2);
+  }
+  .file .dirty { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-bg); }
 
-  /* Editor: a transparent textarea over a highlight layer with identical metrics. */
-  .editor { flex: 1; min-height: 320px; display: flex; position: relative; background: var(--panel); }
+  /* Editor: a transparent textarea over a coloured layer with identical metrics. */
+  .editor { flex: 1; min-height: 0; display: flex; position: relative; }
   .gutter {
-    flex: none; width: 48px; overflow: hidden; padding: 12px 8px 12px 0; text-align: right;
-    font: var(--code-size)/var(--code-line) var(--font-code); color: var(--muted);
-    background: var(--sunken); border-right: 1px solid var(--line); user-select: none;
-    font-variant-numeric: tabular-nums; white-space: pre;
+    flex: none; width: 52px; overflow: hidden; padding: 12px 12px 12px 0; text-align: right;
+    font: var(--code-size)/var(--code-line) var(--font-code); color: var(--s-com);
+    user-select: none; font-variant-numeric: tabular-nums;
   }
+  .gutter span { display: block; }
+  .gutter .cur { color: var(--fg); }
+  .gutter .bad { color: var(--err); font-weight: 600; }
   .code { flex: 1; position: relative; min-width: 0; }
   .code pre, .code textarea {
-    position: absolute; inset: 0; margin: 0; padding: 12px 14px; border: 0;
+    position: absolute; inset: 0; margin: 0; padding: 12px 16px 12px 4px; border: 0;
     font: var(--code-size)/var(--code-line) var(--font-code); tab-size: 4;
     white-space: pre; overflow-wrap: normal; letter-spacing: 0;
   }
-  .code pre { overflow: hidden; color: transparent; pointer-events: none; padding-bottom: 40px; }
+  .code pre { overflow: hidden; color: var(--fg); pointer-events: none; padding-bottom: 40px; }
   .code textarea {
     width: 100%; height: 100%; resize: none; outline: none; overflow: auto;
-    background: transparent; color: var(--fg); caret-color: var(--accent);
+    background: transparent; color: transparent; caret-color: var(--accent);
   }
-  .code mark { color: transparent; background: none; border-radius: 2px; }
-  .code mark.hl { background: var(--hl); }
-  .code mark.err {
-    text-decoration: underline wavy var(--err); text-decoration-skip-ink: none;
-    text-underline-offset: 4px;
-  }
+  .code textarea::selection { background: var(--sel); color: transparent; }
+  .code .sq { text-decoration: underline wavy var(--err); text-decoration-skip-ink: none; text-underline-offset: 4px; }
+  .code .lk { background: var(--lk); }
   .code .pt { display: inline-block; width: 0; height: var(--code-line); vertical-align: top; }
-  .code .pt.err { border-left: 2px solid var(--err); }
-  .code .pt.hl { border-left: 2px solid var(--lit); }
-
-  .statusbar {
-    display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: space-between;
-    padding: 8px 12px; border-top: 1px solid var(--line); background: var(--sunken);
-    font: 12px/1.5 var(--font-code); color: var(--muted); font-variant-numeric: tabular-nums;
-  }
-  .statusbar b { color: var(--fg); font-weight: 600; }
-  .statusbar .map { color: var(--accent); }
+  .code .pt.sq { border-left: 2px solid var(--err); }
+  .code .pt.lk { border-left: 2px solid var(--accent); }
 
   /* Output tabs */
-  .tabs { display: flex; gap: 2px; align-self: stretch; overflow-x: auto; min-width: 0; scrollbar-width: none; }
+  .tabs { display: flex; align-self: stretch; overflow-x: auto; min-width: 0; scrollbar-width: none; }
   .tabs::-webkit-scrollbar { display: none; }
   .tab {
-    border: 0; background: none; padding: 0 12px; cursor: pointer; color: var(--muted);
-    border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 6px; white-space: nowrap;
+    border: 0; background: none; padding: 0 14px; cursor: pointer; color: var(--muted); font-size: 13px;
+    display: flex; align-items: center; gap: 7px; white-space: nowrap; border-right: 1px solid var(--line);
   }
-  .tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); font-weight: 600; }
-  .count {
-    font-size: 11px; min-width: 20px; padding: 1px 6px; border-radius: 10px; text-align: center;
-    background: var(--sunken); border: 1px solid var(--line); font-variant-numeric: tabular-nums;
-  }
-  .count.bad { background: var(--err); border-color: var(--err); color: var(--panel); }
-  .hint { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .tab:hover { color: var(--fg); }
+  .tab[aria-selected="true"] { color: var(--fg); background: var(--panel); box-shadow: inset 0 2px 0 var(--accent); margin-bottom: -1px; }
+  .count { font: 11px var(--font-code); color: var(--muted); font-variant-numeric: tabular-nums; }
+  .count.bad { color: var(--err); font-weight: 600; }
 
-  .out { flex: 1; min-height: 320px; overflow: auto; }
+  .out { flex: 1; min-height: 0; overflow: auto; }
   .row {
-    display: flex; align-items: baseline; gap: 10px; padding: 1px 12px; cursor: pointer;
+    display: flex; align-items: baseline; gap: 12px; padding: 0 16px; cursor: pointer;
     font: var(--code-size)/var(--code-line) var(--font-code); white-space: pre;
   }
+  .out > .row:first-child, .ast .row:first-child { margin-top: 10px; }
   .row:hover { background: var(--accent-soft); }
-  .row.current { background: var(--hl); }
+  .row.current { background: var(--lk); }
   .row .sp { margin-left: auto; padding-left: 16px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
   /* Tokens */
+  .tok-pos { width: 56px; flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
   .tok-kind { width: 64px; flex: none; font-size: 11.5px; color: var(--muted); }
-  .tok-pos { width: 72px; flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .k-Keyword { color: var(--accent); font-weight: 600; }
-  .k-Int, .k-String, .k-Bool { color: var(--lit); }
-  .k-Punct, .k-EOF { color: var(--muted); }
-  .k-Error { color: var(--err); font-weight: 600; }
 
-  /* AST: indent guides drawn from the depth */
+  /* Trees: indent guides drawn from the depth */
   .ast .row {
-    padding-left: calc(12px + var(--d) * 18px);
+    padding-left: calc(16px + var(--d) * 18px);
     background-image: repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px 18px);
-    background-size: calc(var(--d) * 18px) 100%; background-repeat: no-repeat; background-position: 16px 0;
+    background-size: calc(var(--d) * 18px) 100%; background-repeat: no-repeat; background-position: 20px 0;
   }
   .ast .row:hover { background-color: var(--accent-soft); }
-  .ast .row.current { background-color: var(--hl); }
+  .ast .row.current { background-color: var(--lk); }
   .field { color: var(--muted); }
-  .kind { font-weight: 600; }
-  .extra { color: var(--lit); }
+  .kind { color: var(--fg); font-weight: 600; }
+  .extra { color: var(--s-num); }
+  .badge {
+    font: 600 10px/16px var(--font-code); padding: 0 5px; border-radius: 2px; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--accent); border: 1px solid var(--lk-edge);
+  }
 
-  /* Diagnostics */
-  .diags { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
-  .diag { border: 1px solid var(--line); border-left: 3px solid var(--err); border-radius: 6px; cursor: pointer; }
-  .diag.note { border-left-color: var(--muted); }
-  .diag:hover { background: var(--accent-soft); }
-  .diag-head { padding: 8px 12px 4px; font-weight: 600; }
-  .diag-head .loc { font-family: var(--font-code); font-weight: 400; color: var(--muted); margin-right: 6px; }
+  /* Diagnostics, in the same shape as the command line prints them */
+  .diag { padding: 10px 16px 6px; border-bottom: 1px solid var(--line); box-shadow: inset 2px 0 0 var(--err); cursor: pointer; }
+  .diag:hover { background: var(--err-soft); }
+  .diag-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-weight: 500; }
+  .sev { font: 600 11px var(--font-code); text-transform: uppercase; letter-spacing: 0.05em; color: var(--err); }
+  .note-head .sev { color: var(--muted); }
+  .note-head { font-weight: 400; color: var(--fg-2); }
+  .loc { font: 12px var(--font-code); color: var(--muted); }
   .diag pre {
-    margin: 0; padding: 4px 12px 10px; overflow-x: auto; tab-size: 4;
+    margin: 4px 0 6px; padding: 0; overflow-x: auto; tab-size: 4;
     font: var(--code-size)/var(--code-line) var(--font-code); color: var(--muted);
   }
   .diag pre .caret { color: var(--err); font-weight: 700; }
-  .clean { margin: 24px; padding: 16px; border-radius: 8px; background: var(--ok-soft); }
-  .clean.waiting { background: var(--sunken); }
-  .clean.waiting strong { color: var(--fg); }
-  .note-head { font-weight: 500; color: var(--muted); padding-top: 2px; }
-  .badge {
-    font-size: 11px; line-height: 16px; padding: 0 5px; border-radius: 4px;
-    border: 1px solid var(--line); color: var(--muted); font-family: var(--font-ui);
+  .note-part { padding-left: 14px; border-left: 1px solid var(--line-2); margin: 2px 0 6px; }
+
+  /* Summary and empty states */
+  .summary, .empty { padding: 20px 16px; max-width: 560px; }
+  .summary-head { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-weight: 600; }
+  .summary dl {
+    display: grid; grid-template-columns: 1fr auto; margin: 0;
+    font: var(--code-size)/var(--code-line) var(--font-code); border-top: 1px solid var(--line);
   }
+  .summary dt, .summary dd { margin: 0; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .summary dt { color: var(--muted); }
+  .summary dd { text-align: right; font-variant-numeric: tabular-nums; }
+  .empty-title { margin: 0 0 4px; font-weight: 600; }
+  .empty p { color: var(--muted); margin: 0 0 14px; }
 
   /* Generated JavaScript: one underlined segment per source-map entry */
-  .js { padding: 10px 0; }
+  .js { padding: 12px 0; }
   .jsline { display: flex; font: var(--code-size)/var(--code-line) var(--font-code); white-space: pre; }
   .jsline .ln {
-    flex: none; width: 44px; padding-right: 14px; text-align: right; color: var(--muted);
+    flex: none; width: 52px; padding-right: 16px; text-align: right; color: var(--s-com);
     user-select: none; font-variant-numeric: tabular-nums;
   }
-  .seg { cursor: pointer; border-radius: 2px; box-shadow: inset 0 -1px 0 var(--line); }
-  .seg:hover { background: var(--accent-soft); }
-  .seg.current { background: var(--hl); }
+  .seg { cursor: pointer; border-radius: 2px; background-image: linear-gradient(var(--line-2), var(--line-2)); background-size: 100% 1px; background-position: 0 100%; background-repeat: no-repeat; }
+  .seg:hover { background-color: var(--accent-soft); background-image: linear-gradient(var(--accent), var(--accent)); }
+  .seg.current { background-color: var(--lk); box-shadow: 0 0 0 1px var(--lk-edge); }
 
   /* Run */
-  .run { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-  .run-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .run-bar .hint { margin-left: 0; }
+  .run { display: flex; flex-direction: column; min-height: 100%; }
+  .run-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .run-bar .hint { font-size: 12px; color: var(--muted); }
   .run pre {
-    margin: 0; padding: 10px 12px; min-height: 160px; white-space: pre-wrap;
-    background: var(--sunken); border: 1px solid var(--line); border-radius: 6px;
+    flex: 1; margin: 0; padding: 12px 16px; white-space: pre-wrap; background: var(--sunken);
     font: var(--code-size)/var(--code-line) var(--font-code);
   }
+  .run .prompt { color: var(--muted); }
+  .run .prompt b { color: var(--accent); font-weight: 400; }
   .run .err { color: var(--err); }
   .run .muted { color: var(--muted); }
-  .clean strong { color: var(--ok); }
-  .clean p { margin: 4px 0 0; color: var(--muted); max-width: 60ch; }
 
-  footer { padding: 0 20px 14px; color: var(--muted); font-size: 12px; }
-  footer code { font-family: var(--font-code); }
+  /* Status bar */
+  .status {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 2px 18px; min-height: 26px; padding: 3px 16px;
+    background: var(--raised); border-top: 1px solid var(--line);
+    font: 11.5px/1.5 var(--font-code); color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .status b { color: var(--fg); font-weight: 600; }
+  .status .map { color: var(--accent); }
+  .status .spacer { margin-left: auto; }
+  .status .tip { font-family: var(--font-ui); font-size: 12px; }
+  .status abbr { text-decoration: none; cursor: help; border-bottom: 1px dotted var(--line-2); }
 
   @media (max-width: 900px) {
-    main { grid-template-columns: minmax(0, 1fr); padding: 12px 16px; }
-    header, .phases { padding-left: 16px; padding-right: 16px; }
-    .editor { min-height: 50vh; }
-    .hint { display: none; }
+    body { height: auto; min-height: 100%; }
+    main { grid-template-columns: minmax(0, 1fr); }
+    .pane + .pane { border-left: 0; border-top: 1px solid var(--line); }
+    .editor { height: 55vh; flex: none; }
+    .out { height: 65vh; flex: none; }
+    .sub, .controls > label[for] { display: none; }
+    .top { grid-template-columns: 1fr auto; }
+    #theme { grid-row: 1; grid-column: 2; }
+    .controls { grid-row: 2; grid-column: 1 / -1; flex-wrap: nowrap; }
+    .controls select { flex: 1; min-width: 0; max-width: none; }
+    .top { padding: 8px 16px; }
+    .phase { padding-right: 24px; }
   }
   @media (prefers-reduced-motion: no-preference) {
-    .row, .diag, .tab { transition: background-color 80ms; }
+    .row, .diag, .tab, .phase, .seg, .btn, select { transition: background-color 120ms, color 120ms, border-color 120ms; }
+    .opt input::before { transition: left 140ms ease-out; }
   }
 </style>
 </head>
@@ -257,34 +342,36 @@
   In the project folder, run <code>npm run playground</code> and open the address it prints.
 </div>
 
-<header>
-  <div class="brand">
-    <h1>Tether Playground</h1>
-    <p>All 8 milestones: type checker, JavaScript emitter, source maps and -O1</p>
-  </div>
+<header class="top">
+  <a class="brand" href="./" aria-label="Tether playground, home">
+    <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 12c3-5 9 5 12 0"/><circle cx="4.5" cy="12" r="2.8"/><circle cx="19.5" cy="12" r="2.8"/>
+    </svg>
+    <span class="word">tether</span>
+    <span class="sub">playground</span>
+  </a>
   <div class="controls">
     <label for="example">Program</label>
     <select id="example"></select>
     <label class="opt" title="Constant folding and dead-code removal"><input type="checkbox" id="optimise"> -O1</label>
     <button class="btn" id="reset" type="button" title="Discard edits and reload this program">Reset</button>
   </div>
+  <button class="btn icon" id="theme" type="button" aria-label="Switch between light and dark" title="Switch between light and dark">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg>
+  </button>
 </header>
 
 <nav class="phases" id="phases" aria-label="Compiler phases"></nav>
 
 <main>
   <section class="pane" aria-label="Source">
-    <div class="pane-head"><span class="file" id="filename"></span></div>
+    <div class="pane-head"><span class="file"><span id="filename"></span><span class="dirty" id="dirty" title="Edited" hidden></span></span></div>
     <div class="editor">
       <div class="gutter" id="gutter" aria-hidden="true"></div>
       <div class="code">
         <pre id="highlight" aria-hidden="true"></pre>
         <textarea id="source" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off" aria-label="Tether source code"></textarea>
       </div>
-    </div>
-    <div class="statusbar">
-      <span id="cursor"></span>
-      <span id="spaninfo"></span>
     </div>
   </section>
 
@@ -299,14 +386,15 @@
         <button class="tab" role="tab" id="tab-run" data-tab="run" type="button">Run</button>
       </div>
     </div>
-    <div class="out" id="out"></div>
+    <div class="out" id="out" role="tabpanel"></div>
   </section>
 </main>
 
-<footer>
-  This page runs the compiler's own <code>src/</code> modules in the browser. Positions are 1-based line:column+length;
-  the blue figure in the status bar is the same position converted to the 0-based form a source map stores.
-  Hover any row to see its span in the source. Under JavaScript, each underlined segment is one source-map entry.
+<footer class="status">
+  <span id="cursor"></span>
+  <span id="spaninfo"></span>
+  <span class="spacer" id="stats"></span>
+  <abbr title="Positions are 1-based line:column+length, in UTF-16 code units. The amber figure is the same position converted to the 0-based form a source map stores. This page runs the compiler's own src/ modules in the browser.">1-based · <span class="map">map 0-based</span></abbr>
 </footer>
 
 <script type="module">
@@ -335,14 +423,24 @@ const EXAMPLES = [
   { group: 'Optimisation', path: 'test/fixtures/optimisable.tth' },
 ];
 
+// Each phase opens the tab that shows what it produced.
 const PHASES = [
-  { id: 'lex', name: 'Lex' },
-  { id: 'parse', name: 'Parse' },
-  { id: 'check', name: 'Check types' },
-  { id: 'lower', name: 'Lower' },
-  { id: 'emit', name: 'Emit JS' },
-  { id: 'map', name: 'Source map' },
+  { id: 'lex', name: 'Lex', tab: 'tokens' },
+  { id: 'parse', name: 'Parse', tab: 'ast' },
+  { id: 'check', name: 'Check types', tab: 'diagnostics' },
+  { id: 'lower', name: 'Lower', tab: 'core' },
+  { id: 'emit', name: 'Emit JS', tab: 'js' },
+  { id: 'map', name: 'Source map', tab: 'js' },
 ];
+
+const HINTS = {
+  diagnostics: 'Click an entry to select its span',
+  tokens: 'Hover a token to see its span',
+  ast: 'Hover a node to see its span',
+  core: 'Lowered nodes keep the span of the code they replace',
+  js: 'Each underlined segment is one source-map entry',
+  run: '',
+};
 
 const $ = (id) => document.getElementById(id);
 const ta = $('source');
@@ -358,6 +456,22 @@ let originals = new Map();
 let tab = 'js';
 let result = null;
 let hover = null;    // span under the mouse in the output pane
+let errorLines = new Set();
+
+// ---- theme -----------------------------------------------------------------------
+// Follows the system unless switched here; the choice is remembered per browser.
+
+const THEME_KEY = 'tether-theme';
+try {
+  const saved = localStorage.getItem(THEME_KEY);
+  if (saved) document.documentElement.dataset.theme = saved;
+} catch {}
+$('theme').addEventListener('click', () => {
+  const dark = getComputedStyle(document.documentElement).colorScheme.includes('dark');
+  const next = dark ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem(THEME_KEY, next); } catch {}
+});
 
 // ---- compile -----------------------------------------------------------------
 // The same phases, in the same order, as src/compiler.js. Each phase runs only
@@ -411,6 +525,42 @@ function compile() {
   };
 }
 
+// ---- syntax colours ----------------------------------------------------------
+// The editor is coloured from the compiler's own tokens, so what you see is
+// exactly what the lexer produced. Text between tokens is whitespace or a comment.
+
+const TYPES = new Set(['int', 'bool', 'string']);
+
+function tokenClass(tokens, i) {
+  const t = tokens[i];
+  switch (t.kind) {
+    case 'Keyword':
+      if (TYPES.has(t.lexeme)) return 'ty';
+      return t.lexeme === 'true' || t.lexeme === 'false' ? 'lit' : 'kw';
+    case 'Bool': return 'lit';
+    case 'Int': return 'num';
+    case 'String': return 'str';
+    case 'Error': return 'bad';
+    case 'Punct': return 'pun';
+    case 'Ident': return tokens[i + 1]?.lexeme === '(' || tokens[i - 1]?.lexeme === 'fn' ? 'fn' : '';
+    default: return '';
+  }
+}
+
+// The generated JavaScript has a fixed, small vocabulary, so a pattern is enough.
+const JS_SYNTAX = /("(?:[^"\\]|\\.)*")|(\/\/.*)|(?<![\w$])(function|return|if|else|while|let|true|false)(?![\w$])|(?<![\w$])(\d+)(?![\w$])/g;
+
+function colourJs(text) {
+  let html = '';
+  let pos = 0;
+  for (const m of text.matchAll(JS_SYNTAX)) {
+    const cls = m[1] ? 'str' : m[2] ? 'com' : m[3] ? (m[3] === 'true' || m[3] === 'false' ? 'lit' : 'kw') : 'num';
+    html += esc(text.slice(pos, m.index)) + `<span class="${cls}">${esc(m[0])}</span>`;
+    pos = m.index + m[0].length;
+  }
+  return html + esc(text.slice(pos));
+}
+
 // ---- rendering ---------------------------------------------------------------
 
 function renderPhases() {
@@ -425,8 +575,14 @@ function renderPhases() {
     emit: r.code ? phase('ok', plural(r.code.split('\n').length - 1, 'line')) : phase('todo', '—'),
     map: r.map ? phase('ok', plural(r.table.length, 'mapping')) : phase('todo', '—'),
   };
-  $('phases').innerHTML = PHASES.map((p) =>
-    `<div class="phase ${states[p.id].cls}"><span class="name">${p.name}</span><span class="state">${states[p.id].state}</span></div>`).join('');
+  const active = PHASES.find((p) => p.tab === tab)?.id;
+  $('phases').innerHTML = PHASES.map((p, i) => {
+    const s = states[p.id];
+    return `<button class="phase ${s.cls}" type="button" data-tab="${p.tab}"${p.id === active ? ' aria-current="true"' : ''}>` +
+      `<span class="idx">0${i + 1}</span>` +
+      `<span class="name"><i class="dot ${s.cls}"></i>${p.name}</span>` +
+      `<span class="state">${s.state}</span></button>`;
+  }).join('');
 }
 
 function label(node, core) {
@@ -475,18 +631,19 @@ function renderJs() {
     idx.forEach((i, k) => {
       const start = r.table[i].generatedColumn;
       const end = k + 1 < idx.length ? r.table[idx[k + 1]].generatedColumn : text.length;
-      html += esc(text.slice(pos, start));
-      html += `<span class="seg" data-m="${i}">${esc(text.slice(start, end))}</span>`;
+      html += colourJs(text.slice(pos, start));
+      html += `<span class="seg" data-m="${i}">${colourJs(text.slice(start, end))}</span>`;
       pos = end;
     });
-    html += esc(text.slice(pos));
+    html += colourJs(text.slice(pos));
     return `<div class="jsline"><span class="ln">${line + 1}</span><span>${html}</span></div>`;
   });
   return `<div class="js">${rows.join('')}</div>`;
 }
 
-const NOT_YET = (what) => `<div class="clean waiting"><strong>${what} appears when the program has no errors.</strong>
-  <p>Fix the errors listed under Diagnostics first.</p></div>`;
+const NOT_YET = (what) => `<div class="empty"><p class="empty-title">${what} appears once the program compiles.</p>
+  <p>There ${result.diags.errorCount === 1 ? 'is' : 'are'} ${plural(result.diags.errorCount, 'error')} to fix first.</p>
+  <button class="btn" type="button" data-goto="diagnostics">Show diagnostics</button></div>`;
 
 function renderOutput() {
   const r = result;
@@ -499,33 +656,42 @@ function renderOutput() {
   $('count-core').textContent = r.coreNodes.length;
   $('count-js').textContent = r.table.length;
   for (const b of document.querySelectorAll('.tab')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+  out.setAttribute('aria-labelledby', `tab-${tab}`);
 
   if (tab === 'diagnostics') {
     if (!sorted.length) {
-      out.innerHTML = `<div class="clean"><strong>No errors.</strong>
-        <p>Lexed, parsed, type-checked, lowered${r.optimisation ? ', optimised' : ''} and compiled to JavaScript in
-        ${r.ms.toFixed(1)} ms, with ${plural(r.table.length, 'source mapping')}.
-        ${r.retention.kept} of ${plural(r.retention.statements, 'source statement')} keep a mapping.</p></div>`;
+      const facts = [
+        ['Tokens', r.tokens.length],
+        ['Syntax nodes', r.nodes.length],
+        ['Core nodes', r.coreNodes.length],
+        ['JavaScript lines', r.code.split('\n').length - 1],
+        ['Source mappings', r.table.length],
+        ['Statements with a mapping', `${r.retention.kept} / ${r.retention.statements}`],
+        ...(r.optimisation ? [['Expressions folded', r.optimisation.folded], ['Statements removed', r.optimisation.removed]] : []),
+      ];
+      out.innerHTML = `<div class="summary">
+        <p class="summary-head"><i class="dot ok"></i>No errors. Compiled in ${r.ms.toFixed(1)} ms${r.optimisation ? ' with -O1' : ''}.</p>
+        <dl>${facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></div>`;
       return;
     }
-    out.innerHTML = `<div class="diags">${sorted.map((d, i) => {
+    out.innerHTML = sorted.map((d, i) => {
       const loc = d.span ? `${d.span.line}:${d.span.col}` : '';
       const notes = (d.notes ?? []).map((n, k) => `<div class="note-part" data-d="${i}" data-note="${k}">
-          <div class="diag-head note-head"><span class="loc">${n.span.line}:${n.span.col}</span>note: ${esc(n.message)}</div>
+          <div class="diag-head note-head"><span class="sev">note</span><span class="loc">${n.span.line}:${n.span.col}</span>${esc(n.message)}</div>
           ${caretBlock('note', n.message, n.span)}</div>`).join('');
       return `<div class="diag ${d.severity}" data-d="${i}">
-        <div class="diag-head"><span class="loc">${loc}</span>${d.severity}: ${esc(d.message)}</div>
+        <div class="diag-head"><span class="sev">${d.severity}</span><span class="loc">${loc}</span>${esc(d.message)}</div>
         ${caretBlock(d.severity, d.message, d.span)}${notes}
       </div>`;
-    }).join('')}</div>`;
+    }).join('');
     return;
   }
 
   if (tab === 'tokens') {
     out.innerHTML = r.tokens.map((t, i) => `<div class="row" data-t="${i}">` +
       `<span class="tok-pos">${t.span.line}:${t.span.col}</span>` +
-      `<span class="tok-kind k-${t.kind}">${t.kind}</span>` +
-      `<span class="k-${t.kind}">${t.kind === 'EOF' ? '&lt;end of file&gt;' : esc(t.lexeme)}</span>` +
+      `<span class="tok-kind">${t.kind}</span>` +
+      `<span class="${tokenClass(r.tokens, i)}">${t.kind === 'EOF' ? '&lt;end of file&gt;' : esc(t.lexeme)}</span>` +
       `<span class="sp">+${t.span.length}</span></div>`).join('');
     return;
   }
@@ -547,40 +713,72 @@ function renderOutput() {
 
   // tab === 'run'
   out.innerHTML = r.code
-    ? `<div class="run"><div class="run-bar"><button class="btn" id="run-btn" type="button">Run program</button>
+    ? `<div class="run"><div class="run-bar"><button class="btn primary" id="run-btn" type="button">Run program</button>
         <span class="hint">Runs the generated JavaScript in a worker and stops it after 2 seconds.</span></div>
-        <pre id="run-out"></pre></div>`
+        <pre id="run-out"><span class="muted">Press Run program to see the output.</span></pre></div>`
     : NOT_YET('The Run button');
 }
 
-// The highlight layer: same text as the textarea, but transparent, with
-// marks for error spans (wavy underline) and the hovered span (filled).
+// The colour layer: the same text as the textarea, coloured by token, with
+// error spans (wavy underline) and the hovered span (amber) on top.
 function paintSource() {
   const text = ta.value;
-  const clamp = (n) => Math.max(0, Math.min(text.length, n));
-  const ranges = [];
+  const n = text.length;
+  const clamp = (x) => Math.max(0, Math.min(n, x));
+  const tok = new Array(n).fill('com');
+  result.tokens.forEach((t, i) => {
+    const cls = tokenClass(result.tokens, i);
+    for (let k = clamp(t.span.offset); k < clamp(t.span.offset + t.span.length); k++) tok[k] = cls;
+  });
+  const flag = new Uint8Array(n);   // bit 1: error span, bit 2: hovered span
+  const points = new Map();         // zero-length spans, drawn as a bar
+  const mark = (span, bit, cls) => {
+    const a = clamp(span.offset);
+    const b = clamp(span.offset + span.length);
+    if (a === b) points.set(a, (points.get(a) ?? '') + `<span class="pt ${cls}"></span>`);
+    for (let k = a; k < b; k++) flag[k] |= bit;
+  };
+  errorLines = new Set();
   for (const d of result.diags.items) {
-    if (d.span && d.severity === 'error') ranges.push({ s: clamp(d.span.offset), e: clamp(d.span.offset + d.span.length), cls: 'err' });
-  }
-  if (hover) ranges.push({ s: clamp(hover.offset), e: clamp(hover.offset + hover.length), cls: 'hl' });
-  const points = [...new Set([0, text.length, ...ranges.flatMap((r) => [r.s, r.e])])].sort((a, b) => a - b);
-  let html = '';
-  for (let i = 0; i < points.length; i++) {
-    const p = points[i];
-    for (const r of ranges) if (r.s === r.e && r.s === p) html += `<span class="pt ${r.cls}"></span>`;
-    if (i + 1 < points.length) {
-      const q = points[i + 1];
-      const cls = ranges.filter((r) => r.s < r.e && r.s <= p && r.e >= q).map((r) => r.cls);
-      const seg = esc(text.slice(p, q));
-      html += cls.length ? `<mark class="${cls.join(' ')}">${seg}</mark>` : seg;
+    if (d.span && d.severity === 'error') {
+      mark(d.span, 1, 'sq');
+      errorLines.add(d.span.line);
     }
   }
+  if (hover) mark(hover, 2, 'lk');
+
+  let html = '';
+  let start = 0;
+  const flush = (end) => {
+    if (end <= start) return;
+    const cls = [tok[start], flag[start] & 1 ? 'sq' : '', flag[start] & 2 ? 'lk' : ''].filter(Boolean).join(' ');
+    const seg = esc(text.slice(start, end));
+    html += cls ? `<span class="${cls}">${seg}</span>` : seg;
+    start = end;
+  };
+  for (let k = 0; k < n; k++) {
+    if (points.has(k)) {
+      flush(k);
+      html += points.get(k);
+    } else if (k > start && (tok[k] !== tok[start] || flag[k] !== flag[start])) {
+      flush(k);
+    }
+  }
+  flush(n);
+  html += points.get(n) ?? '';
   hl.innerHTML = html + '\n ';
-  const lines = result.source.lineCount;
-  let nums = '';
-  for (let i = 1; i <= lines; i++) nums += i + '\n';
-  gutter.textContent = nums;
+  paintGutter();
   syncScroll();
+}
+
+function paintGutter() {
+  const cur = position(ta.selectionStart).line;
+  let html = '';
+  for (let i = 1; i <= result.source.lineCount; i++) {
+    const cls = errorLines.has(i) ? 'bad' : i === cur ? 'cur' : '';
+    html += cls ? `<span class="${cls}">${i}</span>` : `<span>${i}</span>`;
+  }
+  gutter.innerHTML = html;
 }
 
 function syncScroll() {
@@ -594,7 +792,8 @@ function syncScroll() {
 function runProgram() {
   const pre = $('run-out');
   if (!pre || !result.code) return;
-  pre.innerHTML = '';
+  const name = current.path.split('/').pop().replace(/\.tth$/, '.js');
+  pre.innerHTML = `<span class="prompt"><b>$</b> node ${esc(name)}</span>\n`;
   const append = (text, cls = '') => { pre.insertAdjacentHTML('beforeend', `<span class="${cls}">${esc(text)}</span>\n`); };
   const shim = 'console.log = (...a) => postMessage({ line: a.map(String).join(" ") });\n';
   const blob = new Blob([shim, result.code, '\npostMessage({ done: true });\n'], { type: 'text/javascript' });
@@ -617,6 +816,9 @@ function position(offset) {
   const before = ta.value.slice(0, offset).split(/\r\n|\r|\n/);
   return { line: before.length, col: before[before.length - 1].length + 1 };
 }
+
+// What the status bar says when nothing is hovered or under the cursor.
+const tip = () => HINTS[tab] ? `<span class="tip">${HINTS[tab]}</span>` : '';
 
 function describeSpan(span, what) {
   const m = toMapPosition(span);
@@ -648,6 +850,7 @@ function updateCursor() {
   const off = ta.selectionStart;
   const { line, col } = position(off);
   $('cursor').innerHTML = `Ln <b>${line}</b>, Col <b>${col}</b>`;
+  paintGutter();
   for (const el of out.querySelectorAll('.current')) el.classList.remove('current');
   let rows = [];
   let info = null;
@@ -675,7 +878,7 @@ function updateCursor() {
     row.classList.add('current');
     row.scrollIntoView({ block: 'nearest' });
   }
-  if (!hover) $('spaninfo').innerHTML = info ? describeSpan(info.span, info.what) : '';
+  if (!hover) $('spaninfo').innerHTML = info ? describeSpan(info.span, info.what) : tip();
 }
 
 function mappingInfo(i) {
@@ -706,6 +909,15 @@ function refresh() {
   renderOutput();
   paintSource();
   updateCursor();
+  $('dirty').hidden = ta.value === originals.get(current.path);
+  $('stats').textContent = `${$('optimise').checked ? '-O1' : '-O0'} · ${result.ms.toFixed(1)} ms`;
+}
+
+function showTab(next) {
+  tab = next;
+  renderPhases();
+  renderOutput();
+  updateCursor();
 }
 
 let timer = 0;
@@ -732,7 +944,7 @@ out.addEventListener('mouseover', (e) => {
   if (next === hover) return;
   hover = next;
   paintSource();
-  $('spaninfo').innerHTML = info ? describeSpan(info.span, info.what) : '';
+  $('spaninfo').innerHTML = info ? describeSpan(info.span, info.what) : tip();
 });
 out.addEventListener('mouseleave', () => {
   hover = null;
@@ -740,8 +952,13 @@ out.addEventListener('mouseleave', () => {
   updateCursor();
 });
 out.addEventListener('click', (e) => {
-  if (e.target.id === 'run-btn') {
+  if (e.target.closest('#run-btn')) {
     runProgram();
+    return;
+  }
+  const goto = e.target.closest('[data-goto]');
+  if (goto) {
+    showTab(goto.dataset.goto);
     return;
   }
   const info = spanForRow(e.target.closest(ROW));
@@ -757,13 +974,11 @@ out.addEventListener('click', (e) => {
   updateCursor();
 });
 
-for (const b of document.querySelectorAll('.tab')) {
-  b.addEventListener('click', () => {
-    tab = b.dataset.tab;
-    renderOutput();
-    updateCursor();
-  });
-}
+for (const b of document.querySelectorAll('.tab')) b.addEventListener('click', () => showTab(b.dataset.tab));
+$('phases').addEventListener('click', (e) => {
+  const step = e.target.closest('[data-tab]');
+  if (step) showTab(step.dataset.tab);
+});
 
 const select = $('example');
 const groups = [...new Set(EXAMPLES.map((e) => e.group))];
@@ -803,7 +1018,7 @@ $('optimise').addEventListener('change', refresh);
 const first = fromHash() ?? EXAMPLES[0];
 select.value = first.path;
 load(first.path).catch((err) => {
-  out.innerHTML = `<div class="diags"><div class="diag"><div class="diag-head">${esc(String(err.message))}</div></div></div>`;
+  out.innerHTML = `<div class="diag"><div class="diag-head"><span class="sev">error</span>${esc(String(err.message))}</div></div>`;
 });
 </script>
 </body>

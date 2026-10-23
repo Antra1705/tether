@@ -177,7 +177,7 @@ If the live step fails, open `docs/browser-verification.md` and show the screens
 
 ### Step 10: Playground (switch to the browser)
 
-1. Open `http://localhost:5173/playground/#fib`. All six phases in the strip are green.
+1. Open `http://localhost:5173/playground/#fib`. All six phases in the strip show a green marker. Clicking a phase opens its output.
 2. The **JavaScript** tab: hover an underlined segment. The Tether code it came from lights up.
 3. Click in the source on `fib` in line 7. The matching JavaScript is highlighted.
 4. **Run** tab → **Run program**. The output appears.
