@@ -178,12 +178,14 @@ If the live step fails, open `docs/browser-verification.md` and show the screens
 ### Step 10: Playground (switch to the browser)
 
 1. Open `http://localhost:5173/playground/#fib`. All six phases in the strip show a green marker. Clicking a phase opens its output.
-2. The **JavaScript** tab: hover an underlined segment. The Tether code it came from lights up.
+2. The **JavaScript** tab: hover an underlined segment. The Tether code it came from lights up, and the status bar at the bottom shows both positions, for example `JS 7:0 ← 10:1+151 → map 9:0`: the Tether span (1-based) and the same position as the source map stores it (0-based).
 3. Click in the source on `fib` in line 7. The matching JavaScript is highlighted.
 4. **Run** tab → **Run program**. The output appears.
 5. Pick **semantic-errors.tth** from the dropdown. The **Check types** phase turns red with 8 errors, and the later phases wait.
 6. Pick **optimisable.tth** and tick **-O1**. The phase strip shows `8 folded, 7 removed` and the JavaScript shrinks.
 7. In any program, change `let a = 0;` to `let a = true;`. A type error appears live.
+
+If the projector washes out the dark theme, click the half-circle button at the top right to switch to light. The choice is remembered.
 
 ---
 
