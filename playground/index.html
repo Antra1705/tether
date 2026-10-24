@@ -290,6 +290,21 @@
   .seg:hover { background-color: var(--accent-soft); background-image: linear-gradient(var(--accent), var(--accent)); }
   .seg.current { background-color: var(--lk); box-shadow: 0 0 0 1px var(--lk-edge); }
 
+  /* Source map: the map file, then one row per VLQ segment */
+  .smap { padding: 14px 0 20px; }
+  .smap-label { padding: 0 16px 6px; font-size: 12px; color: var(--muted); }
+  .smap-json {
+    margin: 0 16px 20px; padding: 10px 12px; border: 1px solid var(--line); background: var(--sunken);
+    font: var(--code-size)/var(--code-line) var(--font-code); white-space: pre-wrap; word-break: break-all;
+  }
+  .smap-json .semi { color: var(--muted); }
+  .row.head { cursor: default; color: var(--muted); font: 11.5px/var(--code-line) var(--font-ui); border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+  .row.head:hover { background: none; }
+  .c-seg { width: 64px; flex: none; color: var(--s-str); }
+  .c-dl { width: 180px; flex: none; color: var(--muted); }
+  .c-pos { width: 52px; flex: none; font-variant-numeric: tabular-nums; }
+  .c-name { width: 72px; flex: none; color: var(--s-fn); overflow: hidden; text-overflow: ellipsis; }
+
   /* Run */
   .run { display: flex; flex-direction: column; min-height: 100%; }
   .run-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--line); }
@@ -383,6 +398,7 @@
         <button class="tab" role="tab" id="tab-ast" data-tab="ast" type="button">Syntax tree <span class="count" id="count-ast">0</span></button>
         <button class="tab" role="tab" id="tab-core" data-tab="core" type="button">Core <span class="count" id="count-core">0</span></button>
         <button class="tab" role="tab" id="tab-js" data-tab="js" type="button">JavaScript <span class="count" id="count-js">0</span></button>
+        <button class="tab" role="tab" id="tab-map" data-tab="map" type="button">Source map <span class="count" id="count-map">0</span></button>
         <button class="tab" role="tab" id="tab-run" data-tab="run" type="button">Run</button>
       </div>
     </div>
@@ -409,6 +425,7 @@ import { emit } from '../src/emit.js';
 import { buildSourceMap } from '../src/sourcemap.js';
 import { CHILD_FIELDS } from '../src/ast.js';
 import { formatSpan, toMapPosition } from '../src/span.js';
+import { decodeVLQ } from '../src/vlq.js';
 
 document.getElementById('boot').hidden = true;
 
@@ -430,7 +447,7 @@ const PHASES = [
   { id: 'check', name: 'Check types', tab: 'diagnostics' },
   { id: 'lower', name: 'Lower', tab: 'core' },
   { id: 'emit', name: 'Emit JS', tab: 'js' },
-  { id: 'map', name: 'Source map', tab: 'js' },
+  { id: 'map', name: 'Source map', tab: 'map' },
 ];
 
 const HINTS = {
@@ -439,6 +456,7 @@ const HINTS = {
   ast: 'Hover a node to see its span',
   core: 'Lowered nodes keep the span of the code they replace',
   js: 'Each underlined segment is one source-map entry',
+  map: 'Each VLQ segment is one mapping; hover it to see the Tether code it points at',
   run: '',
 };
 
@@ -518,9 +536,11 @@ function compile() {
     }
   }
   const ms = performance.now() - t0;
+  // Segment i of `mappings` encodes mapping i: the emitter records them in generated order.
+  const segments = map ? map.mappings.split(';').flatMap((line) => line.split(',').filter(Boolean)) : [];
   result = {
     source, diags, tokens, ast, nodes: flatten(ast), core, coreNodes: core ? flatten(core) : [],
-    code, table, map, lexErrors, parseErrors, checkErrors, ms, optimisation,
+    code, table, map, segments, lexErrors, parseErrors, checkErrors, ms, optimisation,
     retention: code ? mappingRetention(ast, table) : null,
   };
 }
@@ -641,6 +661,44 @@ function renderJs() {
   return `<div class="js">${rows.join('')}</div>`;
 }
 
+// The map file as Tether writes it, then each segment decoded with the
+// compiler's own VLQ decoder.
+function renderMap() {
+  const r = result;
+  let k = 0;
+  const mappings = r.map.mappings.split(';')
+    .map((line) => line.split(',').filter(Boolean).map((s) => `<span class="seg" data-m="${k++}">${s}</span>`).join(','))
+    .join('<span class="semi">;</span>');
+  const json = [
+    '{',
+    `  "version": ${r.map.version},`,
+    `  "file": ${esc(JSON.stringify(r.map.file))},`,
+    `  "sources": ${esc(JSON.stringify(r.map.sources))},`,
+    `  "sourcesContent": [<span class="com">the original text, ${r.map.sourcesContent[0].length} characters</span>],`,
+    `  "names": ${esc(JSON.stringify(r.map.names))},`,
+    `  "mappings": "${mappings}"`,
+    '}',
+  ].join('\n');
+  const rows = r.segments.map((s, i) => {
+    const fields = [];
+    for (let pos = 0; pos < s.length;) {
+      const { value, next } = decodeVLQ(s, pos);
+      fields.push(value);
+      pos = next;
+    }
+    const m = r.table[i];
+    return `<div class="row" data-m="${i}"><span class="c-seg">${s}</span><span class="c-dl">[${fields.join(', ')}]</span>` +
+      `<span class="c-pos">${m.generatedLine}:${m.generatedColumn}</span><span class="c-pos">${m.originalLine}:${m.originalColumn}</span>` +
+      `<span class="c-name">${m.name ? esc(m.name) : ''}</span><span class="sp">${formatSpan(m.span)}</span></div>`;
+  });
+  return `<div class="smap">
+    <div class="smap-label">${esc(r.map.file)}.map, as Tether writes it</div>
+    <pre class="smap-json">${json}</pre>
+    <div class="smap-label">Each segment decoded: the fields are differences from the previous segment; positions are 0-based, as the map stores them</div>
+    <div class="row head"><span class="c-seg">segment</span><span class="c-dl">fields</span><span class="c-pos">JS</span><span class="c-pos">.tth</span><span class="c-name">name</span><span class="sp">Tether span</span></div>
+    ${rows.join('')}</div>`;
+}
+
 const NOT_YET = (what) => `<div class="empty"><p class="empty-title">${what} appears once the program compiles.</p>
   <p>There ${result.diags.errorCount === 1 ? 'is' : 'are'} ${plural(result.diags.errorCount, 'error')} to fix first.</p>
   <button class="btn" type="button" data-goto="diagnostics">Show diagnostics</button></div>`;
@@ -654,7 +712,8 @@ function renderOutput() {
   $('count-tokens').textContent = r.tokens.length;
   $('count-ast').textContent = r.nodes.length;
   $('count-core').textContent = r.coreNodes.length;
-  $('count-js').textContent = r.table.length;
+  $('count-js').textContent = r.code ? r.code.split('\n').length - 1 : 0;
+  $('count-map').textContent = r.table.length;
   for (const b of document.querySelectorAll('.tab')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   out.setAttribute('aria-labelledby', `tab-${tab}`);
 
@@ -708,6 +767,11 @@ function renderOutput() {
 
   if (tab === 'js') {
     out.innerHTML = r.code ? renderJs() : NOT_YET('The generated JavaScript');
+    return;
+  }
+
+  if (tab === 'map') {
+    out.innerHTML = r.map ? renderMap() : NOT_YET('The source map');
     return;
   }
 
@@ -867,7 +931,7 @@ function updateCursor() {
       rows = [out.querySelector(`[data-t="${i}"]`)];
       info = { span: result.tokens[i].span, what: result.tokens[i].kind };
     }
-  } else if (tab === 'js') {
+  } else if (tab === 'js' || tab === 'map') {
     const i = mappingAt(off);
     if (i >= 0) {
       rows = [...out.querySelectorAll(`[data-m="${i}"]`)];
@@ -883,7 +947,7 @@ function updateCursor() {
 
 function mappingInfo(i) {
   const m = result.table[i];
-  return { span: m.span, what: `JS ${m.generatedLine}:${m.generatedColumn}${m.name ? ` (${esc(m.name)})` : ''} ←` };
+  return { span: m.span, what: `${result.segments[i]} · JS ${m.generatedLine}:${m.generatedColumn}${m.name ? ` (${esc(m.name)})` : ''} ←` };
 }
 
 function spanForRow(el) {
