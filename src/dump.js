@@ -78,11 +78,11 @@ export function dumpMappings(table) {
 // optimisation level (FR-O3).
 export function dumpMapReport(file, rows) {
   let out = `Mapping retention for ${file} (source statements whose first token has a mapping)\n\n`;
-  out += 'level  statements  mapped  retained  mappings  folded  removed\n';
+  out += 'level  statements  mapped  retained  mappings  folded  propagated  removed\n';
   for (const r of rows) {
     out += `${r.level.padEnd(5)}  ${String(r.statements).padStart(10)}  ${String(r.kept).padStart(6)}  ` +
       `${(r.ratio * 100).toFixed(1).padStart(7)}%  ${String(r.mappings).padStart(8)}  ` +
-      `${String(r.folded).padStart(6)}  ${String(r.removed).padStart(7)}\n`;
+      `${String(r.folded).padStart(6)}  ${String(r.propagated).padStart(10)}  ${String(r.removed).padStart(7)}\n`;
   }
   return out;
 }

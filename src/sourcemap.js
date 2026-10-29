@@ -20,7 +20,15 @@ import { encodeVLQ } from './vlq.js';
 
 // Returns { mappings, names }. names lists each original name once, in the
 // order of first use.
-export function encodeMappings(table) {
+//
+// lineCount, when given, is the number of lines in the generated file. Every
+// line then gets a group, including trailing lines with no mappings (the
+// sourceMappingURL comment and the empty last line), so the string ends with
+// ';'. The format allows either form. Writing every line is the more literal
+// reading, and it matters in practice: Node's SourceMap decoder gives the last
+// segment of a string that does not end in a separator the name of the
+// segment before it, even when the last segment has no name field.
+export function encodeMappings(table, lineCount = 0) {
   const names = [];
   const nameIndex = new Map();
   const lines = [];
@@ -62,6 +70,7 @@ export function encodeMappings(table) {
     segments.push(seg);
   }
   lines.push(segments.join(','));
+  while (lines.length < lineCount) lines.push('');
   return { mappings: lines.join(';'), names };
 }
 
@@ -69,8 +78,9 @@ export function encodeMappings(table) {
 // source: the original file's path relative to the map file.
 // sourceContent: the original text, embedded so the debugger needs no access
 // to the source file (FR-X5).
-export function buildSourceMap({ file, source, sourceContent, table }) {
-  const { mappings, names } = encodeMappings(table);
+// lineCount: the number of lines in the generated file (see encodeMappings).
+export function buildSourceMap({ file, source, sourceContent, table, lineCount = 0 }) {
+  const { mappings, names } = encodeMappings(table, lineCount);
   // Key order is fixed so that output is byte-identical between runs (NFR-2).
   return {
     version: 3,

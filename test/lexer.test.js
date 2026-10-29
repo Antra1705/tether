@@ -115,3 +115,13 @@ test('the EOF token sits just past the last character', () => {
   const eof = tokens.at(-1);
   assert.deepEqual([eof.span.line, eof.span.col, eof.span.offset], [2, 3, 5]);
 });
+
+test('break and continue are keywords', () => {
+  const { tokens } = scan('break continue');
+  assert.deepEqual(tokens.slice(0, 2).map((t) => [t.kind, t.lexeme]), [['Keyword', 'break'], ['Keyword', 'continue']]);
+});
+
+test('square brackets are punctuation', () => {
+  const { tokens } = scan('xs[0]');
+  assert.deepEqual(tokens.slice(0, 4).map((t) => [t.kind, t.lexeme]), [['Ident', 'xs'], ['Punct', '['], ['Int', '0'], ['Punct', ']']]);
+});

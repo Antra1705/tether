@@ -14,7 +14,7 @@ node --version
 npm test
 ```
 
-Node must be 18 or higher, and the tests must say `pass 170`.
+Node must be 18 or higher, and the tests must say `pass 209`.
 
 Also build the programs once, for the Chrome step:
 
@@ -46,8 +46,8 @@ clear
 npm test
 ```
 
-Expect: `tests 170`, `pass 170`.
-Say: "170 automated tests, one set per phase, all passing. All eight milestones are done."
+Expect: `tests 209`, `pass 209`.
+Say: "209 automated tests, one set per phase, all passing, and they run on every push on Node 18, 20 and 22. All eight milestones are done."
 
 ---
 
@@ -178,15 +178,41 @@ If the live step fails, open `docs/browser-verification.md` and show the screens
 ### Step 10: Playground (switch to the browser)
 
 1. Open `http://localhost:5173/playground/#fib`. All six phases in the strip show a green marker. Clicking a phase opens its output.
-2. The **JavaScript** tab: hover an underlined segment. The Tether code it came from lights up, and the status bar at the bottom shows both positions, for example `JS 7:0 ← 10:1+151 → map 9:0`: the Tether span (1-based) and the same position as the source map stores it (0-based).
+2. The **JavaScript** tab: hover an underlined segment. The Tether code it came from lights up, an amber line (the tether) is drawn from the segment back to it, and the status bar at the bottom shows both positions, for example `JS 7:0 ← 10:1+151 → map 9:0`: the Tether span (1-based) and the same position as the source map stores it (0-based).
 3. Click in the source on `fib` in line 7. The matching JavaScript is highlighted.
 4. Click **06 Source map** in the pipeline. The **Source map** tab shows `fib.js.map` exactly as Tether writes it, then every VLQ segment decoded. Hover `SAAGA`: `fib` lights up in the source, and the row shows its fields `[9, 0, 0, 3, 0]`, the differences from the previous segment. This is the example worked out by hand in the Review 1 report.
-5. **Run** tab → **Run program**. The output appears.
+5. **Run** tab → **Run program**. The output appears. If a program fails at runtime, the error names the `.tth` line and column, found through the mapping table. To show it, open `#sieve`, add `print(primes[99]);` as a new last line and run: the output ends with `RangeError: index 99 is out of range for an array of length 15` and `at sieve.tth:33:7`. Hover that line and the tether points at the code.
 6. Pick **semantic-errors.tth** from the dropdown. The **Check types** phase turns red with 8 errors, and the later phases wait.
-7. Pick **optimisable.tth** and tick **-O1**. The phase strip shows `8 folded, 7 removed` and the JavaScript shrinks.
+7. Pick **optimisable.tth** and switch on **-O1**. The phase strip shows `8 folded, 1 propagated, 7 removed` and the JavaScript shrinks.
 8. In any program, change `let a = 0;` to `let a = true;`. A type error appears live.
 
 If the projector washes out the dark theme, click the half-circle button at the top right to switch to light. The choice is remembered.
+
+---
+
+### Step 11 (optional): New since the final review
+
+```sh
+clear
+cat test/fixtures/sieve.tth
+node bin/tether.js build test/fixtures/sieve.tth && node out/sieve.js
+```
+
+Expect: `[2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]`, `41`, `15`.
+Say: "Since the final review Tether has arrays, `break` and `continue`. A `continue` inside a `for` loop is the interesting case: lowering turns `for` into `while`, and a JavaScript `continue` in a `while` would skip the update, so lowering puts a copy of the update before the `continue`. The copy keeps the update's span, so the debugger still points at the `for` header."
+
+```sh
+clear
+grep -n "continue" -B1 out/sieve.js | head -2
+printf 'let xs = [1, 2, 3];\n\nprint(xs[5]);\n' > oob.tth
+node bin/tether.js build oob.tth && node --enable-source-maps out/oob.js 2>&1 | grep -m2 "RangeError\|at "
+rm oob.tth out/oob.js out/oob.js.map
+```
+
+Expect: `n = n + 1;` just before `continue;`, then `RangeError: index 5 is out of range for an array of length 3` and a first frame at `oob.tth:3:7`.
+Say: "Every array index is checked. The error is reported at the `.tth` line and column that did the indexing, not inside a helper function."
+
+In the playground, `http://localhost:5173/playground/#sieve` shows the same program; with **-O1** on, the phase strip shows `3 propagated`. **Share** copies a link that opens exactly the program on screen.
 
 ---
 

@@ -145,3 +145,68 @@ test('reserved JavaScript words and shadowing declarations get deterministic nam
   assert.match(r.code, /let var\$1 = 3;/);
   assert.match(r.code, /function class\$\(new\$\)/);
 });
+
+// ---- break and continue ------------------------------------------------------
+
+test('break and continue are allowed in any loop, including nested blocks', () => {
+  ok('while (true) { break; }');
+  ok('for (;;) { if (true) { continue; } break; }');
+  ok('fn f() { let i = 0; while (i < 3) { i += 1; if (i == 2) { continue; } } }');
+});
+
+test('break and continue outside a loop are errors, with a caret on the keyword', () => {
+  fails('break;', /'break' outside a loop/);
+  fails('if (true) { continue; }', /'continue' outside a loop/);
+  const r = compileText('fn f() {\n  break;\n}');
+  assert.deepEqual([r.diags.items[0].span.line, r.diags.items[0].span.col, r.diags.items[0].span.length], [2, 3, 5]);
+});
+
+// ---- arrays -----------------------------------------------------------------
+
+test('array literals take their element type; elements must agree', () => {
+  ok('let xs = [1, 2, 3]; let ys: string[] = ["a"]; let zs: bool[] = [true, false];');
+  fails('let xs = [1, "two"];', /array elements must all be 'int'; this one is 'string'/);
+  fails('let xs: int[] = ["a"];', /array elements must all be 'int'; this one is 'string'/);
+  fails('let xs = [[1]];', /an array cannot contain arrays/);
+});
+
+test('an empty array needs its type from where it is used', () => {
+  ok('let xs: int[] = [];');
+  ok('let xs = [1]; xs = [];');
+  ok('fn f(xs: int[]): int { return len(xs); } print(f([]));');
+  ok('fn g(): string[] { return []; }');
+  fails('let xs = [];', /cannot tell the element type of an empty array/);
+});
+
+test('indexing needs an array and an int index', () => {
+  ok('let xs = [1]; let y: int = xs[0]; xs[0] = y + 1;');
+  fails('let n = 1; print(n[0]);', /only an array can be indexed; this is 'int'/);
+  fails('let xs = [1]; print(xs[true]);', /an array index must be 'int', found 'bool'/);
+  fails('let xs = [1]; xs[0] = "a";', /cannot store 'string' in an array of 'int'/);
+  fails('let xs = [1]; xs[0] += 1;', /compound assignment to an array element is not supported/);
+});
+
+test('len works on arrays and strings; push appends an element of the right type', () => {
+  ok('let xs = [1]; push(xs, 2); print(len(xs) + len("abc"));');
+  fails('print(len(5));', /'len' needs an array or a string, found 'int'/);
+  fails('let xs = [1]; push(xs, "a");', /cannot push 'string' onto an array of 'int'/);
+  fails('push(1, 2);', /the first argument of 'push' must be an array, found 'int'/);
+  fails('let xs = [1]; print(push(xs, 2));', /print needs a value, but this call returns nothing/);
+  fails('print(len());', /'len' expects 1 argument, but got 0/);
+});
+
+test('built-in functions cannot be redeclared at the top level, but can be shadowed in a block', () => {
+  fails('fn len(x: int): int { return x; }', /'len' is a built-in function and cannot be redeclared here/);
+  fails('let push = 1;', /'push' is a built-in function and cannot be redeclared here/);
+  ok('{ let len = 3; print(len); }');
+});
+
+test('arrays cannot be compared with == or used with arithmetic', () => {
+  fails('let a = [1]; print(a == a);', /arrays cannot be compared with '=='; compare their elements instead/);
+  fails('let a = [1]; print(a + a);', /operator '\+' cannot be applied to 'int\[\]' and 'int\[\]'/);
+});
+
+test('reusing a built-in name is one error, not a cascade at every later use', () => {
+  fails('let push = 1;\nprint(push + 1);', /'push' is a built-in function and cannot be redeclared here/);
+  fails('fn len(x: int): int { return x; }\nprint(len(2));', /'len' is a built-in function and cannot be redeclared here/);
+});

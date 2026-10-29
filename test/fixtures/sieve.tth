@@ -1,0 +1,32 @@
+// Sieve of Eratosthenes. Exercises arrays, len and push, break and continue
+// (including continue inside a for loop), and a constant that -O1 propagates.
+
+let limit = 50;
+
+let composite: bool[] = [];
+for (let i = 0; i <= limit; i += 1) {
+  push(composite, false);
+}
+
+let primes: int[] = [];
+for (let n = 2; n <= limit; n += 1) {
+  if (composite[n]) {
+    continue;
+  }
+  push(primes, n);
+  for (let m = n * n; m <= limit; m += n) {
+    composite[m] = true;
+  }
+}
+print(primes);
+
+// The first prime above 40.
+let first = 0;
+for (let i = 0; i < len(primes); i += 1) {
+  if (primes[i] > 40) {
+    first = primes[i];
+    break;
+  }
+}
+print(first);
+print(len(primes));

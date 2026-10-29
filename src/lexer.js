@@ -19,7 +19,7 @@
 import { makeSpan } from './span.js';
 
 export const KEYWORDS = new Set([
-  'fn', 'let', 'if', 'else', 'while', 'for', 'return', 'print',
+  'fn', 'let', 'if', 'else', 'while', 'for', 'break', 'continue', 'return', 'print',
   'int', 'bool', 'string',
   'true', 'false',
 ]);
@@ -28,7 +28,7 @@ export const KEYWORDS = new Set([
 const PUNCTUATORS = [
   '&&', '||', '==', '!=', '<=', '>=', '+=', '-=', '*=', '/=', '%=',
   '+', '-', '*', '/', '%', '!', '=', '<', '>',
-  '(', ')', '{', '}', ',', ';', ':',
+  '(', ')', '{', '}', '[', ']', ',', ';', ':',
 ];
 
 const ESCAPES = { n: '\n', t: '\t', '"': '"', '\\': '\\' };

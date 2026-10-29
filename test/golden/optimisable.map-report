@@ -1,5 +1,5 @@
 Mapping retention for test/fixtures/optimisable.tth (source statements whose first token has a mapping)
 
-level  statements  mapped  retained  mappings  folded  removed
--O0            14      14    100.0%        22       0        0
--O1            14       7     50.0%        16       8        7
+level  statements  mapped  retained  mappings  folded  propagated  removed
+-O0            14      14    100.0%        55       0           0        0
+-O1            14       7     50.0%        24       8           1        7

@@ -20,6 +20,8 @@ export const CHILD_FIELDS = {
   If: ['cond', 'then', 'else'],
   While: ['cond', 'body'],
   For: ['init', 'cond', 'update', 'body'],
+  Break: [],
+  Continue: [],
   Return: ['value'],
   Print: ['value'],
   ExprStmt: ['expr'],
@@ -27,6 +29,8 @@ export const CHILD_FIELDS = {
   Unary: ['operand'],
   Call: ['callee', 'args'],
   Paren: ['expr'],
+  ArrayLit: ['elements'],
+  Index: ['object', 'index'],
   Cond: ['test', 'then', 'else'], // only in the lowered core tree (lower.js)
   Ident: [],
   IntLit: [],

@@ -193,3 +193,42 @@ test('lexer errors do not cascade into parser errors', () => {
     "unexpected character '#'",
   ]);
 });
+
+test('break and continue are statements that span through their semicolon', () => {
+  const { ast, diags } = parseText('while (true) { break; continue; }');
+  assert.deepEqual(diags, []);
+  const [brk, cont] = ast.body[0].body.body;
+  assert.deepEqual([brk.kind, brk.span.col, brk.span.length], ['Break', 16, 6]);
+  assert.deepEqual([cont.kind, cont.span.col, cont.span.length], ['Continue', 23, 9]);
+});
+
+test('a missing semicolon after break is reported just after it', () => {
+  const { diags } = parseText('while (true) { break }');
+  assert.equal(diags.length, 1);
+  assert.match(diags[0].message, /expected ';' after 'break'/);
+});
+
+test('array types, literals, indexing and element assignment', () => {
+  const { ast, diags } = parseText('fn f(xs: int[]): bool[] { return [xs[0] > 1, true]; }\nlet m = [[1], [2]][0][1];\nxs[i + 1] = 2;');
+  assert.deepEqual(diags, []);
+  const [fn, let_, assign] = ast.body;
+  assert.equal(fn.params[0].type.name, 'int[]');
+  assert.deepEqual([fn.returnType.name, fn.returnType.span.col, fn.returnType.span.length], ['bool[]', 18, 6]);
+  const lit = fn.body.body[0].value;
+  assert.deepEqual([lit.kind, lit.elements.length, lit.elements[0].left.kind], ['ArrayLit', 2, 'Index']);
+  // Indexing is left-associative and binds tighter than any operator.
+  const idx = let_.init;
+  assert.deepEqual([idx.kind, idx.object.kind, idx.object.object.kind, idx.index.value], ['Index', 'Index', 'ArrayLit', 1]);
+  assert.deepEqual([assign.kind, assign.target.kind, assign.target.index.kind], ['Assign', 'Index', 'Binary']);
+});
+
+test('only a variable or an array element can be assigned to', () => {
+  const { diags } = parseText('f(x) = 3;');
+  assert.equal(diags.length, 1);
+  assert.match(diags[0].message, /only a variable or an array element can be assigned to/);
+});
+
+test('an unclosed array literal or index is reported', () => {
+  assert.match(parseText('let a = [1, 2;').diags[0].message, /expected '\]' to close the array/);
+  assert.match(parseText('let a = xs[1;').diags[0].message, /expected '\]' to close the index/);
+});

@@ -1,0 +1,47 @@
+"use strict";
+function $get(a, i) { if (i >= 0 && i < a.length) return a[i]; throw $outOfRange(a, i, $get); }
+function $set(a, i, v) { if (i >= 0 && i < a.length) { a[i] = v; return; } throw $outOfRange(a, i, $set); }
+function $outOfRange(a, i, helper) { const e = new RangeError("index " + i + " is out of range for an array of length " + a.length); if (Error.captureStackTrace) Error.captureStackTrace(e, helper); return e; }
+let limit = 50;
+let composite = [];
+{
+  let i = 0;
+  while (i <= limit) {
+    composite.push(false);
+    i = i + 1;
+  }
+}
+let primes = [];
+{
+  let n = 2;
+  while (n <= limit) {
+    if ($get(composite, n)) {
+      n = n + 1;
+      continue;
+    }
+    primes.push(n);
+    {
+      let m = n * n;
+      while (m <= limit) {
+        $set(composite, m, true);
+        m = m + n;
+      }
+    }
+    n = n + 1;
+  }
+}
+console.log("[" + primes.join(", ") + "]");
+let first = 0;
+{
+  let i = 0;
+  while (i < primes.length) {
+    if ($get(primes, i) > 40) {
+      first = $get(primes, i);
+      break;
+    }
+    i = i + 1;
+  }
+}
+console.log(first);
+console.log(primes.length);
+//# sourceMappingURL=sieve.js.map

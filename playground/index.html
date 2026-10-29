@@ -77,7 +77,7 @@
   body {
     margin: 0; background: var(--bg); color: var(--fg);
     font: 14px/1.5 var(--font-ui);
-    display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto;
+    display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto;
     -webkit-font-smoothing: antialiased;
   }
   button, select, input { font: inherit; color: inherit; }
@@ -103,12 +103,14 @@
   /* Top bar */
   .top {
     display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px 8px;
-    min-height: 48px; padding: 6px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+    min-height: 48px; padding: 6px 16px; border-bottom: 1px solid var(--line);
+    /* a faint amber glow behind the logo */
+    background: radial-gradient(360px 110px at 0 0, color-mix(in srgb, var(--accent-bg) 11%, transparent), transparent 70%), var(--panel);
   }
   .brand { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; justify-self: start; }
   .logo { width: 22px; height: 22px; flex: none; }
   .logo circle { fill: var(--accent); }
-  .logo path { fill: none; stroke: var(--fg); stroke-width: 1.6; stroke-linecap: round; }
+  .logo path { fill: none; stroke: var(--fg); stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 1; }
   .word { font: 600 15px/1 var(--font-code); letter-spacing: -0.02em; }
   .sub { font-size: 13px; color: var(--muted); padding-left: 10px; border-left: 1px solid var(--line-2); line-height: 16px; }
   .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -144,9 +146,17 @@
 
   /* Pipeline: one step per compiler phase, each opens its output */
   .phases {
-    display: flex; overflow-x: auto; background: var(--panel); border-bottom: 1px solid var(--line);
+    display: flex; overflow-x: auto; background: var(--panel);
     scrollbar-width: none;
   }
+
+  /* The rail under the pipeline fills as far as compilation got; red where it stopped. */
+  .rail { height: 2px; background: var(--line); overflow: hidden; }
+  .rail i {
+    display: block; height: 100%; background: var(--accent-bg);
+    transform-origin: left; transform: scaleX(var(--done, 0));
+  }
+  .rail.bad i { background: linear-gradient(to right, var(--accent-bg) calc(100% - var(--seg, 16%)), var(--err) 0); }
   .phases::-webkit-scrollbar { display: none; }
   .phase {
     flex: 1 0 auto; position: relative; display: grid; grid-template-columns: auto 1fr; column-gap: 8px;
@@ -158,6 +168,7 @@
   }
   .phase:hover { background: var(--raised); }
   .phase[aria-current="true"] { box-shadow: inset 0 -2px 0 var(--accent); }
+  .phase .state { display: inline-block; }
   .phase .idx { grid-row: span 2; font: 11px/18px var(--font-code); color: var(--muted); }
   .phase .name { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--fg-2); }
   .phase .state { font: 12px/18px var(--font-code); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -210,14 +221,19 @@
   .code .pt.lk { border-left: 2px solid var(--accent); }
 
   /* Output tabs */
-  .tabs { display: flex; align-self: stretch; overflow-x: auto; min-width: 0; scrollbar-width: none; }
+  .tabs { position: relative; display: flex; align-self: stretch; overflow-x: auto; min-width: 0; scrollbar-width: none; }
+  /* One indicator that slides to the selected tab. */
+  .tab-ink {
+    position: absolute; left: 0; top: 0; width: 1px; height: 2px; background: var(--accent); pointer-events: none;
+    transform-origin: left; transform: translateX(var(--x, 0)) scaleX(var(--w, 0));
+  }
   .tabs::-webkit-scrollbar { display: none; }
   .tab {
     border: 0; background: none; padding: 0 14px; cursor: pointer; color: var(--muted); font-size: 13px;
     display: flex; align-items: center; gap: 7px; white-space: nowrap; border-right: 1px solid var(--line);
   }
   .tab:hover { color: var(--fg); }
-  .tab[aria-selected="true"] { color: var(--fg); background: var(--panel); box-shadow: inset 0 2px 0 var(--accent); margin-bottom: -1px; }
+  .tab[aria-selected="true"] { color: var(--fg); background: var(--panel); margin-bottom: -1px; }
   .count { font: 11px var(--font-code); color: var(--muted); font-variant-numeric: tabular-nums; }
   .count.bad { color: var(--err); font-weight: 600; }
 
@@ -305,10 +321,20 @@
   .c-pos { width: 52px; flex: none; font-variant-numeric: tabular-nums; }
   .c-name { width: 72px; flex: none; color: var(--s-fn); overflow: hidden; text-overflow: ellipsis; }
 
+  /* The download bar above the JavaScript and the source map */
+  .out-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .out-bar .hint { font-size: 12px; color: var(--muted); }
+
   /* Run */
   .run { display: flex; flex-direction: column; min-height: 100%; }
   .run-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--line); }
   .run-bar .hint { font-size: 12px; color: var(--muted); }
+  .run pre > span { display: block; }
+  .run-btn-busy { opacity: 0.75; pointer-events: none; }
+  .spinner {
+    width: 11px; height: 11px; border-radius: 50%; display: inline-block;
+    border: 1.5px solid currentColor; border-right-color: transparent;
+  }
   .run pre {
     flex: 1; margin: 0; padding: 12px 16px; white-space: pre-wrap; background: var(--sunken);
     font: var(--code-size)/var(--code-line) var(--font-code);
@@ -316,6 +342,7 @@
   .run .prompt { color: var(--muted); }
   .run .prompt b { color: var(--accent); font-weight: 400; }
   .run .err { color: var(--err); }
+  .run .err-at { padding-left: 2ch; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
   .run .muted { color: var(--muted); }
 
   /* Status bar */
@@ -344,10 +371,69 @@
     .top { padding: 8px 16px; }
     .phase { padding-right: 24px; }
   }
-  @media (prefers-reduced-motion: no-preference) {
-    .row, .diag, .tab, .phase, .seg, .btn, select { transition: background-color 120ms, color 120ms, border-color 120ms; }
-    .opt input::before { transition: left 140ms ease-out; }
+  /* A dot grid behind the screens that have room for it. */
+  .out:has(> .empty), .out:has(> .summary) {
+    background-image: radial-gradient(color-mix(in srgb, var(--fg) 8%, transparent) 1px, transparent 1.3px);
+    background-size: 18px 18px; background-position: 9px 9px;
   }
+
+  /* The tether: a line from the hovered output back to the code it came from. */
+  .tether { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; overflow: visible; }
+  .tether path { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: round; opacity: 0.9; }
+  .tether circle { fill: var(--accent); }
+  .tether[hidden] { display: none; }
+
+  /* Motion. Arrivals decelerate; leaving is faster than arriving; nothing loops
+     except the spinner, which shows work in progress. */
+  :root {
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --t-fast: 120ms;
+    --t-med: 220ms;
+    --t-slow: 420ms;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .row, .diag, .tab, .phase, .seg, .btn, select { transition: background-color var(--t-fast), color var(--t-fast), border-color var(--t-fast), transform var(--t-fast); }
+    .opt input::before { transition: left 140ms ease-out; }
+    .btn:active { transform: scale(0.97); }
+
+    .rail i { transition: transform var(--t-slow) var(--ease-out); }
+    .tab-ink { transition: transform var(--t-med) var(--ease-out); }
+
+    /* A phase whose result changed pulses its marker and lifts its text in. */
+    .phase.changed .dot { animation: pop var(--t-med) var(--ease-out) both; animation-delay: calc(var(--i) * 45ms); }
+    .phase.changed .state { animation: rise var(--t-med) var(--ease-out) both; animation-delay: calc(var(--i) * 45ms); }
+    .phase.changed.bad .dot { animation: pop var(--t-med) var(--ease-out) both, ring 600ms ease-out; animation-delay: calc(var(--i) * 45ms); }
+
+    /* Switching tabs brings the new content up. */
+    .out.enter > * { animation: rise var(--t-med) var(--ease-out) both; }
+
+    /* The linked source span flashes as it lights up. */
+    .code .lk { animation: flash 320ms ease-out; }
+
+    .count.pop { animation: pop var(--t-med) var(--ease-out); }
+    #stats.tick { animation: tick 700ms ease-out; }
+
+    .run pre > span { animation: rise 180ms var(--ease-out) both; animation-delay: var(--d, 0ms); }
+    .spinner { animation: spin 700ms linear infinite; }
+
+    .logo path { animation: draw 700ms var(--ease-out) both; }
+    .logo circle { animation: pop var(--t-med) var(--ease-out) both; }
+    .logo circle:last-child { animation-delay: 450ms; }
+    .logo.relink path { animation: draw 600ms var(--ease-out) both; }
+    .logo.relink circle:last-child { animation: pop var(--t-med) var(--ease-out) 380ms both; }
+
+    .tether path.drawing { transition: stroke-dashoffset 260ms var(--ease-out); }
+    .tether circle.end { animation: pop 180ms var(--ease-out) 200ms both; }
+
+    .theming, .theming * { transition: background-color 300ms, color 300ms, border-color 300ms, fill 300ms, stroke 300ms !important; }
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+  @keyframes pop { 0% { transform: scale(0.4); opacity: 0; } 70% { transform: scale(1.18); opacity: 1; } 100% { transform: scale(1); } }
+  @keyframes ring { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--err) 60%, transparent); } to { box-shadow: 0 0 0 7px transparent; } }
+  @keyframes flash { from { background: color-mix(in srgb, var(--accent-bg) 70%, transparent); } to { background: var(--lk); } }
+  @keyframes tick { from { color: var(--accent); } to { color: var(--muted); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 </style>
 </head>
 <body>
@@ -360,7 +446,7 @@
 <header class="top">
   <a class="brand" href="./" aria-label="Tether playground, home">
     <svg class="logo" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M6 12c3-5 9 5 12 0"/><circle cx="4.5" cy="12" r="2.8"/><circle cx="19.5" cy="12" r="2.8"/>
+      <path d="M6 12c3-5 9 5 12 0" pathLength="1"/><circle cx="4.5" cy="12" r="2.8"/><circle cx="19.5" cy="12" r="2.8"/>
     </svg>
     <span class="word">tether</span>
     <span class="sub">playground</span>
@@ -370,6 +456,7 @@
     <select id="example"></select>
     <label class="opt" title="Constant folding and dead-code removal"><input type="checkbox" id="optimise"> -O1</label>
     <button class="btn" id="reset" type="button" title="Discard edits and reload this program">Reset</button>
+    <button class="btn" id="share" type="button" title="Copy a link that opens this exact program">Share</button>
   </div>
   <button class="btn icon" id="theme" type="button" aria-label="Switch between light and dark" title="Switch between light and dark">
     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/></svg>
@@ -377,6 +464,7 @@
 </header>
 
 <nav class="phases" id="phases" aria-label="Compiler phases"></nav>
+<div class="rail" id="rail" aria-hidden="true"><i></i></div>
 
 <main>
   <section class="pane" aria-label="Source">
@@ -393,6 +481,7 @@
   <section class="pane" aria-label="Compiler output">
     <div class="pane-head">
       <div class="tabs" role="tablist">
+        <span class="tab-ink" id="tab-ink" aria-hidden="true"></span>
         <button class="tab" role="tab" id="tab-diagnostics" data-tab="diagnostics" type="button">Diagnostics <span class="count" id="count-diagnostics">0</span></button>
         <button class="tab" role="tab" id="tab-tokens" data-tab="tokens" type="button">Tokens <span class="count" id="count-tokens">0</span></button>
         <button class="tab" role="tab" id="tab-ast" data-tab="ast" type="button">Syntax tree <span class="count" id="count-ast">0</span></button>
@@ -412,6 +501,10 @@
   <span class="spacer" id="stats"></span>
   <abbr title="Positions are 1-based line:column+length, in UTF-16 code units. The amber figure is the same position converted to the 0-based form a source map stores. This page runs the compiler's own src/ modules in the browser.">1-based · <span class="map">map 0-based</span></abbr>
 </footer>
+
+<svg class="tether" id="tether" aria-hidden="true" hidden>
+  <path id="tether-path"/><circle id="tether-a" r="3"/><circle id="tether-b" class="end" r="3"/>
+</svg>
 
 <script type="module">
 import { SourceFile } from '../src/source.js';
@@ -438,6 +531,7 @@ const EXAMPLES = [
   { group: 'Error fixtures', path: 'test/fixtures/lex-errors.tth' },
   { group: 'Error fixtures', path: 'test/fixtures/semantic-errors.tth' },
   { group: 'Optimisation', path: 'test/fixtures/optimisable.tth' },
+  { group: 'Arrays, break and continue', path: 'test/fixtures/sieve.tth' },
 ];
 
 // Each phase opens the tab that shows what it produced.
@@ -487,7 +581,10 @@ try {
 $('theme').addEventListener('click', () => {
   const dark = getComputedStyle(document.documentElement).colorScheme.includes('dark');
   const next = dark ? 'light' : 'dark';
+  // Cross-fade the colours, just for the switch.
+  document.documentElement.classList.add('theming');
   document.documentElement.dataset.theme = next;
+  setTimeout(() => document.documentElement.classList.remove('theming'), 320);
   try { localStorage.setItem(THEME_KEY, next); } catch {}
 });
 
@@ -532,7 +629,7 @@ function compile() {
       if ($('optimise').checked) ({ program: core, stats: optimisation } = optimize(core));
       const jsFile = fileName.replace(/\.tth$/, '') + '.js';
       ({ code, mappings: table } = emit(core, { mapUrl: `${jsFile}.map` }));
-      map = buildSourceMap({ file: jsFile, source: fileName, sourceContent: ta.value, table });
+      map = buildSourceMap({ file: jsFile, source: fileName, sourceContent: ta.value, table, lineCount: code.split('\n').length });
     }
   }
   const ms = performance.now() - t0;
@@ -568,7 +665,7 @@ function tokenClass(tokens, i) {
 }
 
 // The generated JavaScript has a fixed, small vocabulary, so a pattern is enough.
-const JS_SYNTAX = /("(?:[^"\\]|\\.)*")|(\/\/.*)|(?<![\w$])(function|return|if|else|while|let|true|false)(?![\w$])|(?<![\w$])(\d+)(?![\w$])/g;
+const JS_SYNTAX = /("(?:[^"\\]|\\.)*")|(\/\/.*)|(?<![\w$])(function|return|if|else|while|break|continue|let|true|false)(?![\w$])|(?<![\w$])(\d+)(?![\w$])/g;
 
 function colourJs(text) {
   let html = '';
@@ -591,19 +688,35 @@ function renderPhases() {
     parse: r.parseErrors ? phase('bad', plural(r.parseErrors, 'error')) : phase('ok', plural(r.nodes.length, 'node')),
     check: r.checkErrors === null ? phase('todo', 'skipped') : r.checkErrors ? phase('bad', plural(r.checkErrors, 'error')) : phase('ok', 'types ok'),
     lower: r.core ? phase('ok', plural(r.coreNodes.length, 'node') +
-      (r.optimisation ? ` · ${r.optimisation.folded} folded, ${r.optimisation.removed} removed` : '')) : phase('todo', '—'),
+      (r.optimisation ? ` · ${r.optimisation.folded} folded, ${r.optimisation.propagated} propagated, ${r.optimisation.removed} removed` : '')) : phase('todo', '—'),
     emit: r.code ? phase('ok', plural(r.code.split('\n').length - 1, 'line')) : phase('todo', '—'),
     map: r.map ? phase('ok', plural(r.table.length, 'mapping')) : phase('todo', '—'),
   };
   const active = PHASES.find((p) => p.tab === tab)?.id;
-  $('phases').innerHTML = PHASES.map((p, i) => {
+  // A phase animates only when its status changes (ok, failed, skipped), not
+  // when a count changes, so typing does not make the strip flicker. Opening a
+  // program animates every phase in turn.
+  const changed = (p) => lastPhases[p.id] !== states[p.id].cls;
+  let i = 0;
+  $('phases').innerHTML = PHASES.map((p, index) => {
     const s = states[p.id];
-    return `<button class="phase ${s.cls}" type="button" data-tab="${p.tab}"${p.id === active ? ' aria-current="true"' : ''}>` +
-      `<span class="idx">0${i + 1}</span>` +
+    const anim = changed(p) ? ` changed" style="--i:${i++}` : '';
+    return `<button class="phase ${s.cls}${anim}" type="button" data-tab="${p.tab}"${p.id === active ? ' aria-current="true"' : ''}>` +
+      `<span class="idx">0${index + 1}</span>` +
       `<span class="name"><i class="dot ${s.cls}"></i>${p.name}</span>` +
       `<span class="state">${s.state}</span></button>`;
   }).join('');
+  for (const p of PHASES) lastPhases[p.id] = states[p.id].cls;
+
+  // The rail fills to the last phase that ran; a failed phase ends it in red.
+  const ran = PHASES.filter((p) => states[p.id].cls !== 'todo').length;
+  const failed = PHASES.some((p) => states[p.id].cls === 'bad');
+  $('rail').classList.toggle('bad', failed);
+  $('rail').style.setProperty('--done', String(ran / PHASES.length));
+  $('rail').style.setProperty('--seg', `${100 / Math.max(ran, 1)}%`);
 }
+
+const lastPhases = {};
 
 function label(node, core) {
   switch (node.kind) {
@@ -658,7 +771,29 @@ function renderJs() {
     html += colourJs(text.slice(pos));
     return `<div class="jsline"><span class="ln">${line + 1}</span><span>${html}</span></div>`;
   });
-  return `<div class="js">${rows.join('')}</div>`;
+  return `${downloadBar()}<div class="js">${rows.join('')}</div>`;
+}
+
+// ---- downloading the output --------------------------------------------------
+// The .js names its map in its sourceMappingURL comment, and the map embeds the
+// source, so the two files together are all a browser needs to show the .tth.
+
+const jsName = () => current.path.split('/').pop().replace(/\.tth$/, '') + '.js';
+
+function downloadBar() {
+  const js = esc(jsName());
+  return `<div class="out-bar"><button class="btn" type="button" data-download="js">Download ${js}</button>
+    <button class="btn" type="button" data-download="map">Download ${js}.map</button>
+    <span class="hint">Keep both in one folder and load the .js in a page: DevTools then shows the .tth.</span></div>`;
+}
+
+function download(which) {
+  const name = which === 'js' ? jsName() : `${jsName()}.map`;
+  const text = which === 'js' ? result.code : `${JSON.stringify(result.map)}\n`;
+  const url = URL.createObjectURL(new Blob([text], { type: which === 'js' ? 'text/javascript' : 'application/json' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // The map file as Tether writes it, then each segment decoded with the
@@ -691,7 +826,7 @@ function renderMap() {
       `<span class="c-pos">${m.generatedLine}:${m.generatedColumn}</span><span class="c-pos">${m.originalLine}:${m.originalColumn}</span>` +
       `<span class="c-name">${m.name ? esc(m.name) : ''}</span><span class="sp">${formatSpan(m.span)}</span></div>`;
   });
-  return `<div class="smap">
+  return `${downloadBar()}<div class="smap">
     <div class="smap-label">${esc(r.map.file)}.map, as Tether writes it</div>
     <pre class="smap-json">${json}</pre>
     <div class="smap-label">Each segment decoded: the fields are differences from the previous segment; positions are 0-based, as the map stores them</div>
@@ -704,11 +839,14 @@ const NOT_YET = (what) => `<div class="empty"><p class="empty-title">${what} app
   <button class="btn" type="button" data-goto="diagnostics">Show diagnostics</button></div>`;
 
 function renderOutput() {
+  stopRun();
   const r = result;
   const sorted = r.diags.sorted();
   const errors = r.diags.errorCount;
-  $('count-diagnostics').textContent = errors;
-  $('count-diagnostics').classList.toggle('bad', errors > 0);
+  const badge = $('count-diagnostics');
+  if (badge.textContent !== String(errors) && errors > 0) replay(badge, 'pop');
+  badge.textContent = errors;
+  badge.classList.toggle('bad', errors > 0);
   $('count-tokens').textContent = r.tokens.length;
   $('count-ast').textContent = r.nodes.length;
   $('count-core').textContent = r.coreNodes.length;
@@ -716,6 +854,7 @@ function renderOutput() {
   $('count-map').textContent = r.table.length;
   for (const b of document.querySelectorAll('.tab')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   out.setAttribute('aria-labelledby', `tab-${tab}`);
+  moveInk();
 
   if (tab === 'diagnostics') {
     if (!sorted.length) {
@@ -726,7 +865,7 @@ function renderOutput() {
         ['JavaScript lines', r.code.split('\n').length - 1],
         ['Source mappings', r.table.length],
         ['Statements with a mapping', `${r.retention.kept} / ${r.retention.statements}`],
-        ...(r.optimisation ? [['Expressions folded', r.optimisation.folded], ['Statements removed', r.optimisation.removed]] : []),
+        ...(r.optimisation ? [['Expressions folded', r.optimisation.folded], ['Constants propagated', r.optimisation.propagated], ['Statements removed', r.optimisation.removed]] : []),
       ];
       out.innerHTML = `<div class="summary">
         <p class="summary-head"><i class="dot ok"></i>No errors. Compiled in ${r.ms.toFixed(1)} ms${r.optimisation ? ' with -O1' : ''}.</p>
@@ -778,7 +917,7 @@ function renderOutput() {
   // tab === 'run'
   out.innerHTML = r.code
     ? `<div class="run"><div class="run-bar"><button class="btn primary" id="run-btn" type="button">Run program</button>
-        <span class="hint">Runs the generated JavaScript in a worker and stops it after 2 seconds.</span></div>
+        <span class="hint">Runs the generated JavaScript in a worker, stopping it after 2 seconds or 1000 lines of output.</span></div>
         <pre id="run-out"><span class="muted">Press Run program to see the output.</span></pre></div>`
     : NOT_YET('The Run button');
 }
@@ -853,22 +992,84 @@ function syncScroll() {
 
 // ---- running the program -------------------------------------------------------
 
+// The program runs in a worker, after this prefix. "use strict" comes first, as
+// it does in the .js file. print sends each line to the page, up to RUN_LIMIT
+// lines, and an uncaught error sends its stack, so the page can map it back.
+const RUN_LIMIT = 1000;
+const RUN_PREFIX = '"use strict";\n' +
+  `(() => { let n = 0; console.log = (...a) => { if (++n <= ${RUN_LIMIT}) postMessage({ line: a.map(String).join(" ") }); else if (n === ${RUN_LIMIT} + 1) postMessage({ limit: true }); }; ` +
+  'addEventListener("error", (e) => { e.preventDefault(); postMessage({ error: String(e.error?.stack ?? e.message) }); }); })();\n';
+const PREFIX_LINES = RUN_PREFIX.split('\n').length - 1;
+
+let running = null; // stops the current run; the output pane is about to be redrawn
+
+function stopRun() {
+  if (running) running();
+}
+
+// The first frame of a stack that is in the program, mapped back to the .tth
+// as the source map would: { fn, m } where m is a mapping index, or null.
+function failedAt(stack) {
+  const frame = /at (?:(\S+) \()?blob:[^\s)]*:(\d+):(\d+)/.exec(stack);
+  if (!frame) return null;
+  const line = +frame[2] - 1 - PREFIX_LINES;
+  const column = +frame[3] - 1;
+  let m = -1;
+  result.table.forEach((t, i) => { if (t.generatedLine === line && t.generatedColumn <= column) m = i; });
+  // The JavaScript name of a function may differ from its Tether name (var$).
+  const decl = result.ast.body.find((d) => d.kind === 'FnDecl' && d.name.symbol?.jsName === frame[1]);
+  const fn = decl ? decl.name.name : frame[1];
+  return m >= 0 ? { fn, m } : null;
+}
+
 function runProgram() {
   const pre = $('run-out');
   if (!pre || !result.code) return;
-  const name = current.path.split('/').pop().replace(/\.tth$/, '.js');
-  pre.innerHTML = `<span class="prompt"><b>$</b> node ${esc(name)}</span>\n`;
-  const append = (text, cls = '') => { pre.insertAdjacentHTML('beforeend', `<span class="${cls}">${esc(text)}</span>\n`); };
-  const shim = 'console.log = (...a) => postMessage({ line: a.map(String).join(" ") });\n';
-  const blob = new Blob([shim, result.code, '\npostMessage({ done: true });\n'], { type: 'text/javascript' });
+  stopRun();
+  pre.innerHTML = `<span class="prompt"><b>$</b> node ${esc(jsName())}</span>`;
+  // Lines are drawn once per frame, however fast the program prints them, and
+  // the first ones arrive one after another.
+  let lines = 0;
+  let queue = '';
+  let frame = 0;
+  const flush = () => { frame = 0; pre.insertAdjacentHTML('beforeend', queue); queue = ''; };
+  const append = (text, cls = '', attrs = '') => {
+    const delay = Math.min(lines++, 24) * 28;
+    queue += `<span class="${cls}"${attrs} style="--d:${delay}ms">${esc(text)}</span>`;
+    frame ||= requestAnimationFrame(flush);
+  };
+  const button = $('run-btn');
+  button.classList.add('run-btn-busy');
+  button.innerHTML = '<i class="spinner" aria-hidden="true"></i>Running…';
+  const blob = new Blob([RUN_PREFIX, result.code, '\npostMessage({ done: true });\n'], { type: 'text/javascript' });
   const url = URL.createObjectURL(blob);
   const worker = new Worker(url);
   const t0 = performance.now();
-  const stop = () => { clearTimeout(timer); worker.terminate(); URL.revokeObjectURL(url); };
+  const stop = () => {
+    running = null;
+    clearTimeout(timer);
+    worker.terminate();
+    URL.revokeObjectURL(url);
+    button.classList.remove('run-btn-busy');
+    button.textContent = 'Run program';
+  };
+  running = stop;
   const timer = setTimeout(() => { stop(); append('stopped after 2 seconds (an infinite loop?)', 'err'); }, 2000);
-  worker.onmessage = (e) => {
-    if (e.data.line !== undefined) append(e.data.line);
-    if (e.data.done) { stop(); append(`finished in ${(performance.now() - t0).toFixed(0)} ms`, 'muted'); }
+  worker.onmessage = ({ data }) => {
+    if (running !== stop) return; // sent before the worker was stopped
+    if (data.line !== undefined) append(data.line);
+    if (data.limit) { stop(); append(`stopped after ${RUN_LIMIT} lines of output`, 'err'); }
+    if (data.error) {
+      stop();
+      append(data.error.split('\n')[0], 'err');
+      const at = failedAt(data.error);
+      if (at) {
+        const { line, col } = result.table[at.m].span;
+        const where = `${current.path.split('/').pop()}:${line}:${col}`;
+        append(`at ${at.fn ? `${at.fn} (${where})` : where}`, 'err err-at', ` data-m="${at.m}"`);
+      }
+    }
+    if (data.done) { stop(); append(`finished in ${(performance.now() - t0).toFixed(0)} ms`, 'muted'); }
   };
   worker.onerror = (e) => { e.preventDefault(); stop(); append(e.message, 'err'); };
 }
@@ -967,14 +1168,86 @@ function spanForRow(el) {
 
 // ---- events ----------------------------------------------------------------------
 
-function refresh() {
-  compile();
+function refresh({ compiled = false } = {}) {
+  if (!compiled) compile();
   renderPhases();
   renderOutput();
   paintSource();
   updateCursor();
   $('dirty').hidden = ta.value === originals.get(current.path);
   $('stats').textContent = `${$('optimise').checked ? '-O1' : '-O0'} · ${result.ms.toFixed(1)} ms`;
+  replay($('stats'), 'tick');
+  // When a broken program compiles again, the logo's tether redraws.
+  const ok = !result.diags.hasErrors();
+  if (ok && compiledBefore === false) replay(document.querySelector('.logo'), 'relink');
+  compiledBefore = ok;
+}
+
+let compiledBefore = null;
+
+// Restarts a one-off CSS animation by removing and re-adding its class.
+function replay(el, cls) {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
+// Slides the indicator to the selected tab.
+function moveInk() {
+  const selected = document.querySelector('.tab[aria-selected="true"]');
+  const ink = $('tab-ink');
+  if (!selected) return;
+  ink.style.setProperty('--x', `${selected.offsetLeft}px`);
+  ink.style.setProperty('--w', String(selected.offsetWidth));
+}
+window.addEventListener('resize', () => { moveInk(); hideTether(); });
+
+// ---- the tether ------------------------------------------------------------------
+// Hovering output draws a line from it back to the source span it maps to: the
+// source map, made visible. Only when the panes sit side by side.
+
+const tether = $('tether');
+const tetherPath = $('tether-path');
+
+// The overlay is an SVG element, which has no `hidden` property: toggle the attribute.
+function hideTether() {
+  tether.setAttribute('hidden', '');
+}
+
+function drawTether(target) {
+  const lit = hl.querySelector('.lk, .pt.lk');
+  if (!target || !lit || matchMedia('(max-width: 900px)').matches) return hideTether();
+  const box = (el) => el.getBoundingClientRect();
+  const editor = box(document.querySelector('.code'));
+  const pane = box(out);
+  const from = lit.getClientRects()[0] ?? box(lit);
+  const to = target.getClientRects()[0] ?? box(target);
+  // The line starts under the span and runs along the gap between lines, like
+  // an underline, so it never strikes through code. It ends at the edge of the
+  // output pane, beside the row (near the top of a tall row such as an error).
+  const x1 = from.left;
+  const y1 = from.bottom + 1.5;
+  const x2 = pane.left + 3;
+  const y2 = to.top + Math.min(to.height / 2, 10);
+  // Both ends must be on screen, inside their panes.
+  if (y1 < editor.top || y1 > editor.bottom || x1 > editor.right || y2 < pane.top || y2 > pane.bottom) return hideTether();
+  const bend = Math.min(Math.max(from.right + 12, editor.right - 72), x2 - 24);
+  const dx = (x2 - bend) / 2;
+  tetherPath.setAttribute('d', `M${x1} ${y1} H${bend} C${bend + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`);
+  for (const [id, x, y] of [['tether-a', x1, y1], ['tether-b', x2, y2]]) {
+    $(id).setAttribute('cx', x);
+    $(id).setAttribute('cy', y);
+  }
+  tether.removeAttribute('hidden');
+  // Draw the line in from the source end.
+  const length = tetherPath.getTotalLength();
+  tetherPath.classList.remove('drawing');
+  tetherPath.style.strokeDasharray = `${length}`;
+  tetherPath.style.strokeDashoffset = `${length}`;
+  void tetherPath.getBoundingClientRect();
+  tetherPath.classList.add('drawing');
+  tetherPath.style.strokeDashoffset = '0';
+  replay($('tether-b'), 'end');
 }
 
 function showTab(next) {
@@ -982,6 +1255,8 @@ function showTab(next) {
   renderPhases();
   renderOutput();
   updateCursor();
+  hideTether();
+  replay(out, 'enter');
 }
 
 let timer = 0;
@@ -989,7 +1264,8 @@ ta.addEventListener('input', () => {
   clearTimeout(timer);
   timer = setTimeout(refresh, 120);
 });
-ta.addEventListener('scroll', syncScroll);
+ta.addEventListener('scroll', () => { syncScroll(); hideTether(); });
+out.addEventListener('scroll', hideTether);
 for (const ev of ['keyup', 'click', 'select']) ta.addEventListener(ev, updateCursor);
 ta.addEventListener('keydown', (e) => {
   // Tab inserts a tab character instead of leaving the editor.
@@ -1008,10 +1284,12 @@ out.addEventListener('mouseover', (e) => {
   if (next === hover) return;
   hover = next;
   paintSource();
+  drawTether(info ? e.target.closest(ROW) : null);
   $('spaninfo').innerHTML = info ? describeSpan(info.span, info.what) : tip();
 });
 out.addEventListener('mouseleave', () => {
   hover = null;
+  hideTether();
   paintSource();
   updateCursor();
 });
@@ -1023,6 +1301,11 @@ out.addEventListener('click', (e) => {
   const goto = e.target.closest('[data-goto]');
   if (goto) {
     showTab(goto.dataset.goto);
+    return;
+  }
+  const save = e.target.closest('[data-download]');
+  if (save) {
+    download(save.dataset.download);
     return;
   }
   const info = spanForRow(e.target.closest(ROW));
@@ -1049,6 +1332,50 @@ const groups = [...new Set(EXAMPLES.map((e) => e.group))];
 select.innerHTML = groups.map((g) => `<optgroup label="${g}">${EXAMPLES.filter((e) => e.group === g)
   .map((e) => `<option value="${e.path}">${e.path.split('/').pop()}</option>`).join('')}</optgroup>`).join('');
 
+// ---- shared links ------------------------------------------------------------
+// A shared link carries the program itself in the URL fragment, as UTF-8 in
+// base64url: #name=fib.tth&O1=1&code=…  The fragment never reaches the
+// server, so a shared program stays in the browser.
+
+function toBase64Url(text) {
+  let bin = '';
+  for (const byte of new TextEncoder().encode(text)) bin += String.fromCharCode(byte);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function fromBase64Url(code) {
+  const bin = atob(code.replace(/-/g, '+').replace(/_/g, '/'));
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+}
+
+// Adds (or replaces) the shared program as an entry in the program list.
+function addShared(name, text) {
+  const entry = { group: 'Shared', path: `shared/${name.replace(/[^\w.-]/g, '_')}` };
+  const old = EXAMPLES.findIndex((e) => e.group === 'Shared');
+  if (old >= 0) EXAMPLES.splice(old, 1);
+  EXAMPLES.push(entry);
+  originals.set(entry.path, text);
+  select.querySelector('optgroup[label="Shared"]')?.remove();
+  select.insertAdjacentHTML('beforeend', `<optgroup label="Shared"><option value="${esc(entry.path)}">${esc(entry.path.split('/').pop())}</option></optgroup>`);
+  return entry;
+}
+
+$('share').addEventListener('click', async () => {
+  const params = new URLSearchParams({ name: current.path.split('/').pop() });
+  if ($('optimise').checked) params.set('O1', '1');
+  params.set('code', toBase64Url(ta.value));
+  const url = `${location.origin}${location.pathname}#${params}`;
+  history.replaceState(null, '', url);
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(url);
+    copied = true;
+  } catch {}
+  const button = $('share');
+  button.textContent = copied ? 'Link copied' : 'Link is in the address bar';
+  setTimeout(() => { button.textContent = 'Share'; }, 2000);
+});
+
 async function load(path, { keepTab = false } = {}) {
   current = EXAMPLES.find((e) => e.path === path);
   if (!originals.has(path)) {
@@ -1061,29 +1388,50 @@ async function load(path, { keepTab = false } = {}) {
   ta.setSelectionRange(0, 0);
   $('filename').textContent = path;
   hover = null;
+  for (const id of Object.keys(lastPhases)) delete lastPhases[id];
   compile();
   if (!keepTab) tab = result.diags.hasErrors() ? 'diagnostics' : 'js';
-  refresh();
+  refresh({ compiled: true });
 }
 
-// #fib, #syntax-errors, ... open that program directly, which is handy for a demo.
-const fromHash = () => EXAMPLES.find((e) => location.hash === `#${e.path.split('/').pop().replace('.tth', '')}`);
+// Opens a program, showing in the output pane why it could not be loaded.
+function openProgram(path, options) {
+  load(path, options).catch((err) => {
+    stopRun();
+    out.innerHTML = `<div class="diag"><div class="diag-head"><span class="sev">error</span>${esc(String(err.message))}</div></div>`;
+  });
+}
+
+// #fib, #syntax-errors, ... open that program directly, which is handy for a
+// demo. A fragment with code= opens a shared program.
+function fromHash() {
+  const hash = location.hash.slice(1);
+  if (hash.includes('code=')) {
+    const params = new URLSearchParams(hash);
+    try {
+      const entry = addShared(params.get('name') || 'shared.tth', fromBase64Url(params.get('code')));
+      $('optimise').checked = params.has('O1');
+      return entry;
+    } catch {
+      return null; // a damaged link opens the default program instead
+    }
+  }
+  return EXAMPLES.find((e) => location.hash === `#${e.path.split('/').pop().replace('.tth', '')}`);
+}
 select.addEventListener('change', () => {
-  history.replaceState(null, '', `#${select.value.split('/').pop().replace('.tth', '')}`);
-  load(select.value);
+  if (!select.value.startsWith('shared/')) history.replaceState(null, '', `#${select.value.split('/').pop().replace('.tth', '')}`);
+  openProgram(select.value);
 });
 window.addEventListener('hashchange', () => {
   const e = fromHash();
-  if (e) { select.value = e.path; load(e.path); }
+  if (e) { select.value = e.path; openProgram(e.path); }
 });
-$('reset').addEventListener('click', () => load(current.path, { keepTab: true }));
-$('optimise').addEventListener('change', refresh);
+$('reset').addEventListener('click', () => openProgram(current.path, { keepTab: true }));
+$('optimise').addEventListener('change', () => refresh());
 
 const first = fromHash() ?? EXAMPLES[0];
 select.value = first.path;
-load(first.path).catch((err) => {
-  out.innerHTML = `<div class="diag"><div class="diag-head"><span class="sev">error</span>${esc(String(err.message))}</div></div>`;
-});
+openProgram(first.path);
 </script>
 </body>
 </html>

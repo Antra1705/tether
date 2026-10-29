@@ -1,5 +1,5 @@
 Mapping retention for examples/primes.tth (source statements whose first token has a mapping)
 
-level  statements  mapped  retained  mappings  folded  removed
--O0            16      16    100.0%        38       0        0
--O1            16      16    100.0%        38       0        0
+level  statements  mapped  retained  mappings  folded  propagated  removed
+-O0            16      16    100.0%        60       0           0        0
+-O1            16      16    100.0%        60       0           0        0

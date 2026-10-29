@@ -45,7 +45,7 @@ export function compile(name, text, { jsFile = 'out.js', mapFile = `${jsFile}.ma
   r.code = code;
   r.table = mappings;
   if (mapFile !== null) {
-    r.map = buildSourceMap({ file: jsFile, source: sourcePath, sourceContent: text, table: mappings });
+    r.map = buildSourceMap({ file: jsFile, source: sourcePath, sourceContent: text, table: mappings, lineCount: code.split('\n').length });
   }
   return r;
 }

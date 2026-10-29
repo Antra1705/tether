@@ -27,7 +27,7 @@ export const BINARY_PRECEDENCE = new Map([
 const ASSIGN_OPS = new Set(['=', '+=', '-=', '*=', '/=', '%=']);
 const TYPE_NAMES = new Set(['int', 'bool', 'string']);
 // Tokens at which synchronize() may stop: each one starts a statement.
-const STATEMENT_START = new Set(['fn', 'let', 'if', 'while', 'for', 'return', 'print', '{']);
+const STATEMENT_START = new Set(['fn', 'let', 'if', 'while', 'for', 'break', 'continue', 'return', 'print', '{']);
 
 class ParseError extends Error {}
 class TooManyErrors extends Error {}
@@ -64,10 +64,6 @@ class Parser {
 
   get prev() {
     return this.tokens[this.pos - 1];
-  }
-
-  peek(n = 1) {
-    return this.tokens[Math.min(this.pos + n, this.tokens.length - 1)];
   }
 
   advance() {
@@ -181,14 +177,17 @@ class Parser {
     return { kind: 'Param', span: union(name.span, type.span), name, type };
   }
 
-  // type ::= "int" | "bool" | "string"
+  // type ::= ( "int" | "bool" | "string" ) [ "[" "]" ]
   parseType(what) {
     const t = this.cur;
     if (t.kind === 'Keyword' && TYPE_NAMES.has(t.lexeme)) {
       this.advance();
-      return { kind: 'TypeRef', span: t.span, name: t.lexeme };
+      if (!this.at('[')) return { kind: 'TypeRef', span: t.span, name: t.lexeme };
+      this.advance();
+      const close = this.expect(']', `to finish the array type '${t.lexeme}[]'`);
+      return { kind: 'TypeRef', span: union(t.span, close.span), name: `${t.lexeme}[]` };
     }
-    this.fail(`expected ${what} ('int', 'bool' or 'string'), found ${describe(t)}`, t.span);
+    this.fail(`expected ${what} ('int', 'bool' or 'string', or an array of one), found ${describe(t)}`, t.span);
   }
 
   parseIdent(what) {
@@ -226,6 +225,8 @@ class Parser {
         case 'if': return this.parseIf();
         case 'while': return this.parseWhile();
         case 'for': return this.parseFor();
+        case 'break': return this.parseJump('Break');
+        case 'continue': return this.parseJump('Continue');
         case 'return': return this.parseReturn();
         case 'print': return this.parsePrint();
         case '{': return this.parseBlock();
@@ -253,16 +254,21 @@ class Parser {
     return { kind: 'Let', span: union(kw.span, init.span), name, type, init };
   }
 
-  // simpleStmt ::= IDENT assignOp expr | expr
+  // simpleStmt ::= target assignOp expr | expr
+  // target     ::= IDENT | postfix "[" expr "]"
+  //
+  // The left side is parsed as an expression and then checked, so that an
+  // array element (`xs[i] = v`) can be assigned as well as a variable.
   parseSimple() {
-    const next = this.peek();
-    if (this.cur.kind === 'Ident' && next.kind === 'Punct' && ASSIGN_OPS.has(next.lexeme)) {
-      const target = this.parseIdent('assignment target');
-      const op = this.advance().lexeme;
-      const value = this.parseExpr();
-      return { kind: 'Assign', span: union(target.span, value.span), op, target, value };
-    }
     const expr = this.parseExpr();
+    if (this.cur.kind === 'Punct' && ASSIGN_OPS.has(this.cur.lexeme)) {
+      if (expr.kind !== 'Ident' && expr.kind !== 'Index') {
+        this.fail('only a variable or an array element can be assigned to', expr.span);
+      }
+      const opTok = this.advance();
+      const value = this.parseExpr();
+      return { kind: 'Assign', span: union(expr.span, value.span), op: opTok.lexeme, opSpan: opTok.span, target: expr, value };
+    }
     return { kind: 'ExprStmt', span: expr.span, expr };
   }
 
@@ -302,6 +308,14 @@ class Parser {
     return { kind: 'For', span: union(kw.span, body.span), init, cond, update, body };
   }
 
+  // breakStmt ::= "break" ";"
+  // continueStmt ::= "continue" ";"
+  parseJump(kind) {
+    const kw = this.advance();
+    const semi = this.expect(';', `after '${kw.lexeme}'`);
+    return { kind, span: union(kw.span, semi.span) };
+  }
+
   // returnStmt ::= "return" [ expr ] ";"
   parseReturn() {
     const kw = this.advance();
@@ -332,21 +346,34 @@ class Parser {
       if (prec === undefined || prec < minPrec) return left;
       this.advance();
       const right = this.parseExpr(prec + 1); // +1: left-associative
-      left = { kind: 'Binary', span: union(left.span, right.span), op: t.lexeme, left, right };
+      left = { kind: 'Binary', span: union(left.span, right.span), op: t.lexeme, opSpan: t.span, left, right };
     }
   }
 
-  // unary ::= ( "-" | "!" ) unary | primary
+  // unary ::= ( "-" | "!" ) unary | postfix
   parseUnary() {
     if (this.at('-') || this.at('!')) {
       const op = this.advance();
       const operand = this.parseUnary();
       return { kind: 'Unary', span: union(op.span, operand.span), op: op.lexeme, operand };
     }
-    return this.parsePrimary();
+    return this.parsePostfix();
   }
 
-  // primary ::= INT | STRING | BOOL | IDENT [ "(" [ expr { "," expr } ] ")" ] | "(" expr ")"
+  // postfix ::= primary { "[" expr "]" }
+  parsePostfix() {
+    let e = this.parsePrimary();
+    while (this.at('[')) {
+      this.advance();
+      const index = this.parseExpr();
+      const close = this.expect(']', 'to close the index');
+      e = { kind: 'Index', span: union(e.span, close.span), object: e, index };
+    }
+    return e;
+  }
+
+  // primary ::= INT | STRING | BOOL | IDENT [ "(" [ expr { "," expr } ] ")" ]
+  //           | "(" expr ")" | "[" [ expr { "," expr } ] "]"
   parsePrimary() {
     const t = this.cur;
     switch (t.kind) {
@@ -377,6 +404,16 @@ class Parser {
       const expr = this.parseExpr();
       const close = this.expect(')', 'to close the parenthesised expression');
       return { kind: 'Paren', span: union(open.span, close.span), expr };
+    }
+    if (this.at('[')) {
+      const open = this.advance();
+      const elements = [];
+      if (!this.at(']')) {
+        do elements.push(this.parseExpr());
+        while (this.eat(','));
+      }
+      const close = this.expect(']', 'to close the array');
+      return { kind: 'ArrayLit', span: union(open.span, close.span), elements };
     }
     this.fail(`expected an expression, found ${describe(t)}`, t.span);
   }

@@ -7,7 +7,7 @@
     "tether": "bin/tether.js"
   },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test test/*.test.js",
     "test:update-golden": "TETHER_UPDATE_GOLDEN=1 node --test",
     "build:examples": "node scripts/build-examples.js",
     "playground": "node scripts/serve.js",

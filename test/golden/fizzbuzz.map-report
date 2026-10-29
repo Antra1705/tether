@@ -1,5 +1,5 @@
 Mapping retention for examples/fizzbuzz.tth (source statements whose first token has a mapping)
 
-level  statements  mapped  retained  mappings  folded  removed
--O0            17      17    100.0%        50       0        0
--O1            17      17    100.0%        50       0        0
+level  statements  mapped  retained  mappings  folded  propagated  removed
+-O0            17      17    100.0%        73       0           0        0
+-O1            17      17    100.0%        73       0           0        0

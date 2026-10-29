@@ -142,6 +142,7 @@ function mapReport(file, text, paths) {
       level: optimise ? '-O1' : '-O0',
       ...mappingRetention(r.ast, r.table),
       folded: r.optimisation?.folded ?? 0,
+      propagated: r.optimisation?.propagated ?? 0,
       removed: r.optimisation?.removed ?? 0,
     };
   });

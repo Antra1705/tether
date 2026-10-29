@@ -87,3 +87,45 @@ test('no code is generated when there are errors (FR-S4)', () => {
   assert.equal(r.code, null);
   assert.equal(r.map, null);
 });
+
+test('break and continue behave as in C and Java, including continue in a for loop', () => {
+  assert.deepEqual(run(`
+    for (let i = 0; i < 10; i += 1) {
+      if (i % 3 == 0) { continue; }
+      if (i > 7) { break; }
+      print(i);
+    }`), ['1', '2', '4', '5', '7']);
+  // Without the update before continue, this loop would never end.
+  assert.deepEqual(run('let n = 0; for (let i = 0; i < 5; i += 1) { continue; } print(n);'), ['0']);
+  assert.deepEqual(run('let i = 0; while (true) { i += 1; if (i < 3) { continue; } break; } print(i);'), ['3']);
+});
+
+test('arrays: literals, indexing, element assignment, len, push and printing', () => {
+  assert.deepEqual(run(`
+    fn sum(xs: int[]): int { let t = 0; for (let i = 0; i < len(xs); i += 1) { t += xs[i]; } return t; }
+    let xs = [3, 1, 4];
+    xs[1] = 9;
+    push(xs, 2);
+    print(xs);
+    print(sum(xs));
+    print(len("tether"));
+    let words: string[] = [];
+    push(words, "a");
+    push(words, "b");
+    print(words);
+    print([true, false]);`), ['[3, 9, 4, 2]', '18', '6', '[a, b]', '[true, false]']);
+});
+
+test('arrays are passed by reference, as in Java', () => {
+  assert.deepEqual(run('fn grow(xs: int[]) { push(xs, 0); } let a = [1]; grow(a); print(len(a));'), ['2']);
+});
+
+test('the index helpers are emitted only into programs that index an array', () => {
+  assert.doesNotMatch(compileText('let xs = [1]; print(len(xs));').code, /\$get/);
+  assert.match(compileText('let xs = [1]; print(xs[0]);').code, /^"use strict";\nfunction \$get/);
+});
+
+test('an index out of range throws a RangeError instead of reading undefined', () => {
+  assert.throws(() => run('let xs = [1, 2]; print(xs[2]);'), (e) => e.name === 'RangeError' && /index 2 is out of range for an array of length 2/.test(e.message));
+  assert.throws(() => run('let xs = [1]; xs[-1] = 5;'), /index -1 is out of range for an array of length 1/);
+});

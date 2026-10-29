@@ -1,0 +1,5 @@
+Mapping retention for test/fixtures/sieve.tth (source statements whose first token has a mapping)
+
+level  statements  mapped  retained  mappings  folded  propagated  removed
+-O0            19      19    100.0%       100       0           0        0
+-O1            19      19    100.0%       100       0           3        0

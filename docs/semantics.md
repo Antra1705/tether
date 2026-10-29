@@ -6,8 +6,10 @@ way each construct runs once translated to JavaScript (`src/lower.js` and
 
 ## Types
 
-There are three value types, `int`, `bool` and `string`. A function with no
-`: type` returns nothing; a call to it is a statement, never a value.
+There are three value types, `int`, `bool` and `string`, and an array type for
+each of them: `int[]`, `bool[]` and `string[]`. Arrays are one-dimensional: an
+array cannot contain arrays. A function with no `: type` returns nothing; a
+call to it is a statement, never a value.
 
 | Construct | Rule |
 |-----------|------|
@@ -25,6 +27,14 @@ There are three value types, `int`, `bool` and `string`. A function with no
 | `f(a, b)` | `f` must be a function; argument count and every argument type must match |
 | `return e` | `e` must match the declared return type; a function with no return type may only use `return;` |
 | `print(e)` | any value; not a call that returns nothing |
+| `[a, b, c]` | every element has the same type `T`; the literal is a `T[]` |
+| `[]` | needs its type from where it is used: `let xs: int[] = [];`, an argument, a `return`, or `xs = [];`. `let xs = [];` is an error |
+| `xs[i]` | `xs` must be an array `T[]` and `i` an `int`; the result is a `T` |
+| `xs[i] = e` | `e` must be a `T`. `xs[i] += e` is not allowed: write `xs[i] = xs[i] + e` |
+| `len(x)` | `x` an array or a `string`; the result is an `int` |
+| `push(xs, e)` | `xs` a `T[]` and `e` a `T`; returns nothing |
+| `==` `!=` on arrays | not allowed: compare the elements |
+| `break`, `continue` | only inside a `while` or `for` loop |
 
 A function with a return type must return a value on every path. The check is
 conservative: a `return` returns; a block returns if any statement in it
@@ -50,6 +60,9 @@ global        every function, collected before anything is checked
 - In `let x = e`, the name `x` is declared after `e` is checked, so
   `{ let x = x + 1; }` reads the outer `x`.
 - The variable declared in a `for` header is scoped to the loop.
+- `len` and `push` are built-in functions in the global scope. Declaring a
+  function or variable with either name at the top level is an error; a
+  nested block may shadow them.
 
 ## Error reporting
 
@@ -64,18 +77,26 @@ only the unknown variable.
 |--------|---------------------|
 | `fn f(a: int): int { … }` | `function f(a) { … }` |
 | `let x = e;` | `let x = e;` |
-| `for (init; c; u) B` | `{ init; while (c) { B…; u; } }` (no `break` or `continue` exist, so this is exact) |
+| `for (init; c; u) B` | `{ init; while (c) { B…; u; } }` |
+| `continue` belonging to that `for` | `u; continue;`: a JavaScript `continue` in a `while` jumps straight to the condition, so the update is run first. The copy of `u` keeps `u`'s span |
+| `break` | `break;` (it leaves the `while`, as it left the `for`) |
 | `x op= e` | `x = x op e;` |
 | `a && b` / `a \|\| b` | `a ? b : false` / `a ? true : b` (short-circuit is kept) |
 | `a / b` | `Math.trunc(a / b)`: integer division truncates toward zero |
 | `a % b` | `a % b` (JavaScript also truncates toward zero) |
 | `==` / `!=` | `===` / `!==` (operands always have the same type) |
-| `print(e)` | `console.log(e)` |
+| `print(e)` | `console.log(e)`; an array prints as `[1, 2, 3]` |
+| `[a, b]` | `[a, b]` |
+| `xs[i]` / `xs[i] = e` | `$get(xs, i)` / `$set(xs, i, e)`: checked against the length |
+| `len(x)` / `push(xs, e)` | `x.length` / `xs.push(e)` |
 | string literal | JSON-style literal, with U+2028 and U+2029 escaped |
 
 The file starts with `"use strict";` and ends with
 `//# sourceMappingURL=<name>.js.map` (unless `--no-map` is given). No runtime
-library is needed (NFR-5).
+library is needed (NFR-5), with one exception: a program that indexes an array
+gets three one-line helper functions after `"use strict";`, `$get`, `$set`
+and `$outOfRange`, which check every index. A program that does not index an
+array gets none of them.
 
 ### Renaming (FR-G3)
 
@@ -99,6 +120,13 @@ zero gives `Infinity` (`NaN` for `0 / 0` or `x % 0`) rather than an error. A run
 JavaScript's `RangeError`, which the source map reports at the original
 `.tth` line.
 
+An array index outside `0` to `len(xs) - 1` throws a `RangeError` such as
+`index 7 is out of range for an array of length 6`, instead of JavaScript's
+silent `undefined`. The helper removes itself from the stack trace (with
+`Error.captureStackTrace`, where the engine has it), so the first frame is the
+indexing expression, and with the source map it names the `.tth` line and
+column. Arrays are passed to functions by reference, as in Java.
+
 ## Optimisation (-O1)
 
 `-O1` runs `src/optimize.js` on the lowered tree, before emission (FR-O1).
@@ -112,13 +140,20 @@ JavaScript's `RangeError`, which the source map reports at the original
 | A conditional with a constant test (from `&&` and `\|\|`) | `true && x` → `x` |
 | `if` with a constant condition | `if (false) A else B` → `B` |
 | `while (false) { … }` | removed |
-| Statements after one that always returns | removed |
+| Statements after one that always returns, breaks or continues | removed |
+| A variable initialised with a constant and never assigned | each read is replaced by the constant: `let n = 10; print(n * 2);` → `print(20)` |
 
 Folding is skipped whenever it could change what the program prints: division
 or remainder by zero, a result that is not a safe integer, and negative zero.
-There is no constant propagation: `let x = 2; print(x * 3);` is left as it is.
+
+Constant propagation works on the checker's symbols, not on names, so a
+shadowing declaration cannot be confused with the variable it shadows. A
+variable that is assigned anywhere, even once, is not a constant, and arrays
+are never propagated (their elements can change). The `let` that declares a
+constant is kept, so it keeps its mapping and a debugger can still show the
+variable.
 
 A folded expression takes the span of the whole expression it replaces
-(FR-O2). Removed statements lose their mappings; `--map-report` and
+(FR-O2); a propagated constant takes the span of the identifier it replaces. Removed statements lose their mappings; `--map-report` and
 `npm run map-report` measure how many source statements keep one (FR-O3).
 The results are in `fidelity.md`.

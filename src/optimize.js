@@ -5,12 +5,19 @@
 //   Constant folding   an operator applied to literals becomes a literal:
 //                      2 * 3 -> 6, "a" + "b" -> "ab", 1 < 2 -> true,
 //                      true ? x : y -> x
+//   Constant           a variable initialised with a constant and never
+//   propagation        assigned is replaced by that constant wherever it is
+//                      read: let n = 10; print(n * 2) -> print(20). The let
+//                      itself stays, so it keeps its mapping and a debugger
+//                      can still show the variable
 //   Dead code          if (false) { … } and while (false) { … } disappear,
 //                      if (true) A else B becomes A, and statements after a
-//                      statement that always returns are dropped
+//                      statement that always returns, breaks or continues
+//                      are dropped
 //
 // A folded expression takes the span of the whole expression it replaces
-// (FR-O2) and is marked `folded: true`. Folding never changes what a program
+// (FR-O2) and is marked `folded: true`; a propagated constant takes the span
+// of the identifier it replaces. Folding never changes what a program
 // prints: it is skipped where JavaScript would give a different value, for
 // division or remainder by zero, a result that is not a safe integer, and
 // negative zero.
@@ -19,14 +26,23 @@
 // statements keep one (FR-O3).
 
 import { returns } from './checker.js';
-import { children } from './ast.js';
+import { children, walk } from './ast.js';
 
 export function optimize(program) {
-  const stats = { folded: 0, removed: 0 };
+  const stats = { folded: 0, propagated: 0, removed: 0 };
 
-  // Counts the statements in a subtree that is being dropped. A block is a
-  // container, not a statement of its own.
+  // Variables that are assigned anywhere, by symbol, so shadowing cannot
+  // confuse two variables with the same name. Only the others can be constant.
+  const assigned = new Set();
+  walk(program, (n) => { if (n.kind === 'Assign' && n.target.kind === 'Ident') assigned.add(n.target.symbol); });
+  const constants = new Map(); // symbol -> literal node
+
+  // Counts the source statements in a subtree that is being dropped. A block
+  // is a container, not a statement of its own, and a for loop's update is
+  // part of the for statement (counted once, as the loop), however many
+  // copies of it lowering made.
   const countRemoved = (node) => {
+    if (node.forUpdate) return 0;
     let n = isStatement(node) && node.kind !== 'Block' ? 1 : 0;
     for (const [, c] of children(node)) n += countRemoved(c);
     return n;
@@ -64,6 +80,16 @@ export function optimize(program) {
       }
       case 'Call':
         return { ...e, args: e.args.map(expr) };
+      case 'ArrayLit':
+        return { ...e, elements: e.elements.map(expr) };
+      case 'Index':
+        return { ...e, object: expr(e.object), index: expr(e.index) };
+      case 'Ident': {
+        const c = constants.get(e.symbol);
+        if (!c) return e;
+        stats.propagated++;
+        return { kind: c.kind, span: e.span, value: c.value, folded: true };
+      }
       default:
         return e;
     }
@@ -74,12 +100,12 @@ export function optimize(program) {
   }
 
   // Optimises a statement list, dropping whatever follows a statement that
-  // always returns.
+  // always leaves it.
   function stmts(list) {
     const out = [];
     for (let i = 0; i < list.length; i++) {
       for (const s of stmt(list[i])) out.push(s);
-      if (out.length && returns(out[out.length - 1])) {
+      if (out.length && jumps(out[out.length - 1])) {
         drop(list.slice(i + 1));
         break;
       }
@@ -92,11 +118,16 @@ export function optimize(program) {
     switch (s.kind) {
       case 'FnDecl': return [{ ...s, body: block(s.body) }];
       case 'Block': return [block(s)];
-      case 'Let': return [{ ...s, init: expr(s.init) }];
-      case 'Assign': return [{ ...s, value: expr(s.value) }];
+      case 'Let': {
+        const init = expr(s.init);
+        if (isLit(init) && !assigned.has(s.name.symbol)) constants.set(s.name.symbol, init);
+        return [{ ...s, init }];
+      }
+      case 'Assign': return [{ ...s, target: s.target.kind === 'Index' ? expr(s.target) : s.target, value: expr(s.value) }];
       case 'ExprStmt': return [{ ...s, expr: expr(s.expr) }];
       case 'Print': return [{ ...s, value: expr(s.value) }];
       case 'Return': return [{ ...s, value: s.value ? expr(s.value) : null }];
+      case 'Break': case 'Continue': return [s];
       case 'If': {
         const cond = expr(s.cond);
         if (cond.kind === 'BoolLit') {
@@ -125,8 +156,19 @@ export function optimize(program) {
   return { program: { ...program, body: stmts(program.body) }, stats };
 }
 
-const STATEMENTS = new Set(['FnDecl', 'Block', 'Let', 'Assign', 'ExprStmt', 'Print', 'Return', 'If', 'While']);
+const STATEMENTS = new Set(['FnDecl', 'Block', 'Let', 'Assign', 'ExprStmt', 'Print', 'Return', 'Break', 'Continue', 'If', 'While']);
 const isStatement = (n) => STATEMENTS.has(n.kind);
+
+// True when control never reaches the statement after `s`: it always returns,
+// breaks or continues.
+function jumps(s) {
+  switch (s.kind) {
+    case 'Break': case 'Continue': return true;
+    case 'Block': return s.body.some(jumps);
+    case 'If': return s.else !== null && jumps(s.then) && jumps(s.else);
+    default: return returns(s);
+  }
+}
 
 const isLit = (n) => n.kind === 'IntLit' || n.kind === 'BoolLit' || n.kind === 'StringLit';
 

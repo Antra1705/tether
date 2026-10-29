@@ -1,0 +1,29 @@
+# Runs the test suite on every push and pull request, on the oldest Node the
+# project supports (18, see package.json "engines") and on the current LTS
+# releases. The project has no dependencies, so there is nothing to install.
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --version
+      - run: npm test
+      - name: Benchmarks print their expected output
+        run: |
+          npm run build:examples
+          for p in fib primes collatz fizzbuzz; do
+            node out/$p.js | diff - test/expected/$p.out
+          done

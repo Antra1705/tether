@@ -38,7 +38,18 @@ missing `;`, still gets one caret.
 The emitter records a mapping table while it writes (`src/emit.js`): each
 entry pairs a generated position with an original span. It records the first
 token of every statement and every identifier, declared or referenced
-(FR-X4). Identifier entries also carry the original name.
+(FR-X4), and, inside expressions, the start of every expression and every
+binary operator. Identifier entries also carry the original name. Where
+several entries start at the same generated column (a statement, the call it
+starts with, and the call's name), the innermost one is kept.
+
+Expression mappings mean a position inside a long expression resolves to the
+sub-expression it came from, not just to the start of the statement. For
+example, in `return fib(n - 1) + fib(n - 2);` the `+` between the calls, each
+`-`, and each literal has its own mapping. A built-in whose JavaScript starts
+with its argument (`len(xs)` becomes `xs.length`) maps the property name back
+to the built-in's name, so the statement still has a mapping to its first
+token.
 
 `src/sourcemap.js` encodes the table as Source Map v3:
 
@@ -49,7 +60,7 @@ token of every statement and every identifier, declared or referenced
 | `sources` | the original file, relative to the map's directory, with `/` separators |
 | `sourcesContent` | the original text, so a debugger needs no access to the `.tth` file (FR-X5) |
 | `names` | each original identifier once, in order of first use |
-| `mappings` | Base64 VLQ, `;` per generated line, `,` per segment (FR-X2) |
+| `mappings` | Base64 VLQ, `;` per generated line, `,` per segment (FR-X2); a group for every generated line, including the trailing lines with no mappings |
 
 A segment holds the generated column, source index, original line and
 original column, plus a name index when it maps an identifier. Each field is
@@ -58,8 +69,18 @@ line; the other fields carry on across the file (FR-X3). Every position in the
 map is 0-based and comes from `toMapPosition()`.
 
 Code created by lowering (a `while` made from a `for`, the `x + 1` made from
-`x += 1`) has the span of the construct that caused it (FR-M2), so it maps
-back to that construct.
+`x += 1`, the copy of a `for` loop's update placed before a `continue`) has
+the span of the construct that caused it (FR-M2), so it maps back to that
+construct.
+
+`mappings` has a group for every line of the generated file, so it ends with
+`;` (the `sourceMappingURL` comment and the empty last line have no
+mappings). The format allows the trailing groups to be left out, but Node's
+`SourceMap` decoder mishandles a string that ends in a segment: it gives that
+last segment the name of the segment before it, even when the last segment
+has no name field. The test suite found this once expression mappings put an
+unnamed literal last (`console.log(fibIter(40))`). Writing every line is the
+more literal reading of the format and avoids the problem in every decoder.
 
 ### Verification
 
@@ -71,7 +92,10 @@ dependency (NFR-1). `test/sourcemap.test.js` checks, for every benchmark:
   gives back the same original position and name (AC-3);
 - every segment has 4 or 5 fields and points at a position that exists in the
   source, and every name index is within `names`;
-- every statement and every identifier in the source has a mapping;
+- every statement and every identifier in the source has a mapping, and so do
+  every expression and every binary operator;
+- `mappings` has a group for every generated line;
 - `sourceMappingURL` and `sources` resolve on disk relative to the files;
 - a runtime error, run with `node --enable-source-maps`, is reported at the
-  original `.tth` line and column.
+  original `.tth` line and column, both for runaway recursion and for an
+  array index out of range.

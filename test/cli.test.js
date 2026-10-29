@@ -163,6 +163,17 @@ test('-O1 folds constants and removes dead code, without changing the output', (
   golden('optimisable.O1.js.txt', js1);
 });
 
+test('sieve.tth uses arrays, break and continue, and prints exactly the expected output at -O0 and -O1', () => {
+  for (const flags of [[], ['-O1']]) {
+    const r = runCli('build', 'test/fixtures/sieve.tth', ...flags);
+    assert.equal(r.code, 0, r.stderr);
+    const out = runJs(r.files.get('out/sieve.js'));
+    assert.equal(`${out.join('\n')}\n`, readFileSync('test/expected/sieve.out', 'utf8'));
+  }
+  golden('sieve.js.txt', runCli('build', 'test/fixtures/sieve.tth').files.get('out/sieve.js'));
+  golden('sieve.map-report', runCli('build', 'test/fixtures/sieve.tth', '--map-report').stdout);
+});
+
 test('--map-report compares mapping retention at -O0 and -O1 (FR-O3)', () => {
   const r = runCli('build', 'test/fixtures/optimisable.tth', '--map-report');
   assert.equal(r.code, 0, r.stderr);

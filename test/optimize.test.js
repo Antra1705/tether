@@ -37,16 +37,39 @@ test('keeps an expression whenever folding could change the result', () => {
   assert.match(body(O1('print(9007199254740991 + 1);')), /9007199254740991 \+ 1/); // not a safe integer
 });
 
-test('folding stops at variables: no constant propagation', () => {
-  assert.equal(body(O1('let x = 2; print(x * 3);')), 'let x = 2;\nconsole.log(x * 3);');
+test('a constant that is never assigned is propagated, and folding continues', () => {
+  assert.equal(body(O1('let x = 2; print(x * 3);')), 'let x = 2;\nconsole.log(6);');
+  assert.equal(body(O1('let a = 2; let b = a * 3; print(b);')), 'let a = 2;\nlet b = 6;\nconsole.log(6);');
+  assert.equal(body(O1('let s = "te"; print(s + "ther");')), 'let s = "te";\nconsole.log("tether");');
+});
+
+test('a variable that is assigned anywhere is not a constant', () => {
+  assert.equal(body(O1('let x = 2; x = 3; print(x);')), 'let x = 2;\nx = 3;\nconsole.log(x);');
+  assert.match(body(O1('let i = 0; while (i < 3) { i += 1; } print(i);')), /console\.log\(i\)/);
+  assert.match(body(O1('let n = f(); print(n); fn f(): int { return 1; }')), /console\.log\(n\)/); // not a literal
+});
+
+test('propagation follows the checker\'s symbols, so shadowing cannot mix variables up', () => {
+  const r = O1('let n = 1; { let n = 2; n = 3; print(n); } print(n);');
+  assert.deepEqual(runJs(r.code), ['3', '1']);
+  assert.match(r.code, /console\.log\(n\$1\);\n\}\nconsole\.log\(1\);/);
+});
+
+test('a propagated constant takes the span of the identifier it replaces', () => {
+  const r = O1('let limit = 10;\nprint(limit);');
+  const lits = [];
+  walk(r.core, (n) => { if (n.folded) lits.push([n.kind, n.value, n.span.line, n.span.col, n.span.length]); });
+  assert.deepEqual(lits, [['IntLit', 10, 2, 7, 5]]);
+  assert.equal(r.optimisation.propagated, 1);
 });
 
 test('a folded expression takes the span of the whole expression (FR-O2)', () => {
-  const r = O1('let x = 1;\nprint(x + (2 * 3 - 1));');
+  // x is assigned, so it is not a constant and stays a variable.
+  const r = O1('let x = 1;\nx = 4;\nprint(x + (2 * 3 - 1));');
   const spans = [];
   walk(r.core, (n) => { if (n.folded) spans.push([n.kind, n.value, n.span.line, n.span.col, n.span.length]); });
   // `(2 * 3 - 1)` lost its parentheses in lowering; the literal 5 covers `2 * 3 - 1`.
-  assert.deepEqual(spans, [['IntLit', 5, 2, 12, 9]]);
+  assert.deepEqual(spans, [['IntLit', 5, 3, 12, 9]]);
 });
 
 test('removes dead branches, dead loops and code after return', () => {
@@ -82,9 +105,9 @@ test('mapping retention: all statements keep a mapping at -O0; dead code loses i
   const text = readFileSync('test/fixtures/optimisable.tth', 'utf8');
   const a = O0(text);
   const b = O1(text);
-  assert.deepEqual(mappingRetention(a.ast, a.table), { statements: 14, kept: 14, mappings: 22, ratio: 1 });
-  assert.deepEqual(mappingRetention(b.ast, b.table), { statements: 14, kept: 7, mappings: 16, ratio: 0.5 });
-  assert.deepEqual(b.optimisation, { folded: 8, removed: 7 });
+  assert.deepEqual(mappingRetention(a.ast, a.table), { statements: 14, kept: 14, mappings: 55, ratio: 1 });
+  assert.deepEqual(mappingRetention(b.ast, b.table), { statements: 14, kept: 7, mappings: 24, ratio: 0.5 });
+  assert.deepEqual(b.optimisation, { folded: 8, propagated: 1, removed: 7 });
 });
 
 test('an -O1 source map is still valid: every entry round-trips through Node\'s decoder', async () => {
@@ -95,4 +118,28 @@ test('an -O1 source map is still valid: every entry round-trips through Node\'s 
     const e = decoder.findEntry(m.generatedLine, m.generatedColumn);
     assert.deepEqual([e.originalLine, e.originalColumn], [m.originalLine, m.originalColumn]);
   }
+});
+
+test('statements after break or continue are dead code at -O1', () => {
+  const r = O1('for (let i = 0; i < 3; i += 1) { if (i == 1) { continue; print("gone"); } print(i); break; print("gone"); }');
+  assert.doesNotMatch(r.code, /gone/);
+  assert.deepEqual(runJs(r.code), ['0']);
+  // The two prints. The update that lowering appends after `break` can never
+  // run and is dropped too, but it is part of the for statement, not a source
+  // statement of its own, so it is not counted.
+  assert.equal(r.optimisation.removed, 2);
+  assert.doesNotMatch(r.code, /break;\n\s*i = i \+ 1;/);
+});
+
+test('a loop body that always breaks or continues has no dead source code, so nothing is counted as removed', () => {
+  const r = O1('for (let i = 0; i < 6; i += 1) { if (i == 2) { print(i); continue; } else { break; } }');
+  assert.equal(r.optimisation.removed, 0);
+  assert.deepEqual(runJs(r.code), []);
+});
+
+test('-O1 folds inside arrays and indexes but never propagates an array', () => {
+  const r = O1('let xs = [1 + 1, 2 * 3];\nprint(xs[2 - 1]);');
+  assert.match(r.code, /let xs = \[2, 6\];/);
+  assert.match(r.code, /\$get\(xs, 1\)/);
+  assert.deepEqual(runJs(r.code), ['6']);
 });

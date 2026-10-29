@@ -9,15 +9,35 @@
 // exactly where its text starts. After the last write the counters are
 // checked against the finished string (PRD risk table: column drift).
 //
-// Mappings are recorded for the first token of every statement and for every
-// identifier, declared or referenced (FR-X4). Identifier mappings carry the
-// original Tether name, which may differ from the JavaScript name (FR-G3).
+// Mappings are recorded for the first token of every statement, for every
+// identifier, declared or referenced (FR-X4), and inside expressions: at the
+// start of every expression and at every binary operator. Identifier mappings
+// carry the original Tether name, which may differ from the JavaScript name
+// (FR-G3). Expression mappings let a debugger resolve a position inside a long
+// expression to the sub-expression it came from, not just to the statement.
+// Where several mappings start at the same generated column, the innermost
+// one wins (Writer.map).
+//
+// Array indexing is checked: xs[i] becomes $get(xs, i) and xs[i] = v becomes
+// $set(xs, i, v). The two helpers are written at the top of a program that
+// indexes an array, and only then. An index out of range throws a RangeError
+// whose stack trace starts at the caller, not inside the helper, so with the
+// source map it names the .tth line that did the indexing. '$' cannot appear
+// in a Tether name, so the helpers cannot clash with the program's names.
 //
 // Positions in the mapping table are 0-based, as the source map stores them.
 // They come from toMapPosition(), the single 1-based to 0-based conversion
 // (FR-L2).
 
 import { toMapPosition } from './span.js';
+import { walk } from './ast.js';
+
+// The checked-indexing helpers, one per line.
+export const INDEX_HELPERS = [
+  'function $get(a, i) { if (i >= 0 && i < a.length) return a[i]; throw $outOfRange(a, i, $get); }',
+  'function $set(a, i, v) { if (i >= 0 && i < a.length) { a[i] = v; return; } throw $outOfRange(a, i, $set); }',
+  'function $outOfRange(a, i, helper) { const e = new RangeError("index " + i + " is out of range for an array of length " + a.length); if (Error.captureStackTrace) Error.captureStackTrace(e, helper); return e; }',
+];
 
 const INDENT = '  ';
 
@@ -82,6 +102,7 @@ function precOf(e) {
     case 'Binary': return e.op === '/' ? PREC.call : PREC[e.op]; // '/' becomes Math.trunc(...)
     case 'Unary': return PREC.unary;
     case 'Call': return PREC.call;
+    case 'Index': return PREC.call; // $get(...)
     default: return PREC.atom;
   }
 }
@@ -139,6 +160,16 @@ export function emit(program, { mapUrl = null } = {}) {
         w.write(';');
         return;
       case 'Assign':
+        if (s.target.kind === 'Index') {
+          w.write('$set(');
+          expr(s.target.object, PREC.cond);
+          w.write(', ');
+          expr(s.target.index, PREC.cond);
+          w.write(', ');
+          expr(s.value, PREC.cond);
+          w.write(');');
+          return;
+        }
         ident(s.target);
         w.write(' = ');
         expr(s.value, 0);
@@ -150,8 +181,21 @@ export function emit(program, { mapUrl = null } = {}) {
         return;
       case 'Print':
         w.write('console.log(');
-        expr(s.value, PREC.cond);
+        if (s.array) {
+          // An array prints as [1, 2, 3] wherever the program runs.
+          w.write('"[" + ');
+          expr(s.value, PREC.call);
+          w.write('.join(", ") + "]"');
+        } else {
+          expr(s.value, PREC.cond);
+        }
         w.write(');');
+        return;
+      case 'Break':
+        w.write('break;');
+        return;
+      case 'Continue':
+        w.write('continue;');
         return;
       case 'Return':
         w.write('return');
@@ -186,23 +230,67 @@ export function emit(program, { mapUrl = null } = {}) {
     }
   }
 
+  // len(x) -> x.length; push(xs, v) -> xs.push(v)
+  // The generated text starts with the argument, not with the function name,
+  // so the property name is mapped back to the built-in's name. Otherwise a
+  // statement such as `push(xs, 1);` would have no mapping to its first token.
+  function builtin(e) {
+    expr(e.args[0], PREC.call);
+    w.write('.');
+    w.map(e.callee.span, e.callee.name);
+    if (e.callee.name === 'len') {
+      w.write('length');
+      return;
+    }
+    w.write('push(');
+    expr(e.args[1], PREC.cond);
+    w.write(')');
+  }
+
+  // Writes ' op ', mapping the operator itself to its source token.
+  function operator(op, span) {
+    w.write(' ');
+    if (span) w.map(span);
+    w.write(`${op} `);
+  }
+
   // Writes `e`, in parentheses if it binds more loosely than minPrec allows.
   function expr(e, minPrec) {
     const p = precOf(e);
     const paren = p < minPrec;
     if (paren) w.write('(');
+    if (e.kind !== 'Ident') w.map(e.span); // ident() maps with the name
     switch (e.kind) {
       case 'IntLit': w.write(String(e.value)); break;
       case 'BoolLit': w.write(e.value ? 'true' : 'false'); break;
       case 'StringLit': w.write(jsString(e.value)); break;
       case 'Ident': ident(e); break;
       case 'Call':
+        if (e.callee.symbol?.kind === 'builtin') {
+          builtin(e);
+          break;
+        }
         ident(e.callee);
         w.write('(');
         e.args.forEach((a, i) => {
           if (i) w.write(', ');
           expr(a, PREC.cond);
         });
+        w.write(')');
+        break;
+      case 'ArrayLit':
+        w.write('[');
+        e.elements.forEach((el, i) => {
+          if (i) w.write(', ');
+          expr(el, PREC.cond);
+        });
+        w.write(']');
+        break;
+      case 'Index':
+        w.write('$get(');
+        expr(e.object, PREC.cond);
+        w.write(', ');
+        expr(e.index, PREC.cond);
         w.write(')');
         break;
       case 'Unary':
@@ -213,7 +301,10 @@ export function emit(program, { mapUrl = null } = {}) {
         break;
       case 'Cond':
         expr(e.test, PREC.cond + 1);
-        w.write(' ? ');
+        // A conditional made from && or || maps its '?' to that operator.
+        w.write(' ');
+        if (e.opSpan) w.map(e.opSpan);
+        w.write('? ');
         expr(e.then, PREC.cond);
         w.write(' : ');
         expr(e.else, PREC.cond);
@@ -223,14 +314,14 @@ export function emit(program, { mapUrl = null } = {}) {
           // Integer division truncates toward zero, like C and Java.
           w.write('Math.trunc(');
           expr(e.left, PREC['*']);
-          w.write(' / ');
+          operator('/', e.opSpan);
           expr(e.right, PREC['*'] + 1);
           w.write(')');
         } else {
           // Both operands always have the same static type, so strict equality is exact.
           const op = e.op === '==' ? '===' : e.op === '!=' ? '!==' : e.op;
           expr(e.left, p);
-          w.write(` ${op} `);
+          operator(op, e.opSpan);
           expr(e.right, p + 1); // all binary operators are left-associative
         }
         break;
@@ -241,6 +332,9 @@ export function emit(program, { mapUrl = null } = {}) {
   }
 
   w.write('"use strict";\n');
+  let indexes = false;
+  walk(program, (n) => { if (n.kind === 'Index') indexes = true; });
+  if (indexes) for (const line of INDEX_HELPERS) w.write(`${line}\n`);
   for (const item of program.body) {
     stmt(item);
     w.write('\n');

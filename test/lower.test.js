@@ -89,3 +89,20 @@ for (const file of readdirSync('examples').filter((f) => f.endsWith('.tth'))) {
     assert.ok(synthetic > 0);
   });
 }
+
+test('a continue in a for loop runs the update first; a nested while keeps its own continue', () => {
+  const { core } = lowered('for (let i = 0; i < 3; i += 1) { if (i == 1) { continue; } while (false) { continue; } }');
+  const loop = core.body[0].body[1];
+  const [guard, inner] = loop.body.body;
+  // `if (i == 1) { i = i + 1; continue; }`: a synthetic copy of the update, with the update's span.
+  const [update, cont] = guard.then.body;
+  assert.deepEqual([update.kind, update.synthetic, update.span.col, update.span.length], ['Assign', true, 24, 6]);
+  assert.equal(cont.kind, 'Continue');
+  // The inner while's continue belongs to the inner while: no update before it.
+  assert.deepEqual(inner.body.body.map((s) => s.kind), ['Continue']);
+});
+
+test('break needs no rewriting', () => {
+  const { core } = lowered('for (let i = 0; i < 3; i += 1) { break; }');
+  assert.deepEqual(core.body[0].body[1].body.body.map((s) => s.kind), ['Break', 'Assign']);
+});

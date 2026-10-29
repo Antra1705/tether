@@ -100,12 +100,38 @@ for (const name of benchmarks) {
       if (isStatement || node.kind === 'Ident') assert.ok(mapped.has(at(node.span)), `${node.kind} at ${node.span.line}:${node.span.col}`);
     });
   });
+
+  test(`${name}: every expression and every binary operator has a mapping`, () => {
+    const { r } = build(name);
+    const mapped = new Set(r.table.map((m) => `${m.originalLine}:${m.originalColumn}`));
+    const at = (span) => {
+      const p = toMapPosition(span);
+      return `${p.line}:${p.column}`;
+    };
+    const expressions = new Set(['Binary', 'Unary', 'Call', 'Ident', 'IntLit', 'StringLit', 'BoolLit']);
+    let operators = 0;
+    walk(r.ast, (node) => {
+      if (expressions.has(node.kind)) assert.ok(mapped.has(at(node.span)), `${node.kind} at ${node.span.line}:${node.span.col}`);
+      if (node.kind === 'Binary') {
+        operators++;
+        assert.ok(mapped.has(at(node.opSpan)), `operator ${node.op} at ${node.opSpan.line}:${node.opSpan.col}`);
+      }
+    });
+    assert.ok(operators > 0);
+  });
+
+  test(`${name}: the map has a group for every generated line`, () => {
+    const { r } = build(name);
+    assert.equal(r.map.mappings.split(';').length, r.code.split('\n').length);
+  });
 }
 
 test('delta encoding matches the hand-computed example in the review report (FR-X3)', () => {
   const { r } = build('fib');
   // Line 0 is "use strict"; line 1 is `function fib(n) {`; line 2 is `  if (n < 2) {`.
-  assert.ok(r.map.mappings.startsWith(';AAEA,SAAGA,IAAIC;EACL,IAAIA;'), r.map.mappings.slice(0, 40));
+  // The report worked out line 1 and the first two segments of line 2; the
+  // last two segments of line 2 are the expression mappings for '<' and 2.
+  assert.ok(r.map.mappings.startsWith(';AAEA,SAAGA,IAAIC;EACL,IAAIA,EAAE,EAAE;'), r.map.mappings.slice(0, 40));
 });
 
 test('the generated column restarts on each line; the other fields carry on', () => {
@@ -160,5 +186,41 @@ test('Node reports a runtime error at the original .tth line and column', () => 
     assert.match(plain.stderr, /down\.js:3:10/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('an array index out of range is reported at the .tth line that indexed, not in the helper', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tether-'));
+  try {
+    const src = join(dir, 'oob.tth');
+    writeFileSync(src, 'let xs = [1, 2, 3];\n\nprint(xs[5]);\n');
+    const code = main(['build', src, '-o', dir], {
+      stdout: () => {}, stderr: () => {},
+      readFile: (p) => readFileSync(p, 'utf8'), writeFile: (p, s) => writeFileSync(p, s), mkdir: () => {},
+    });
+    assert.equal(code, 0);
+    const res = spawnSync(process.execPath, ['--enable-source-maps', join(dir, 'oob.js')], { encoding: 'utf8' });
+    assert.match(res.stderr, /RangeError: index 5 is out of range for an array of length 3/);
+    const frames = res.stderr.split('\n').filter((l) => /^\s+at /.test(l));
+    assert.match(frames[0], /oob\.tth:3:7\)$/, 'the first frame is the indexing expression');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('sieve.tth: every statement keeps a mapping at -O0, including calls to the built-ins', () => {
+  const text = readFileSync('test/fixtures/sieve.tth', 'utf8');
+  const r = compile('test/fixtures/sieve.tth', text, { jsFile: 'sieve.js', sourcePath: 'sieve.tth' });
+  const mapped = new Set(r.table.map((m) => `${m.originalLine}:${m.originalColumn}`));
+  walk(r.ast, (node, parent) => {
+    if (parent && (parent.kind === 'Program' || parent.kind === 'Block') || node.kind === 'Ident') {
+      const p = toMapPosition(node.span);
+      assert.ok(mapped.has(`${p.line}:${p.column}`), `${node.kind} at ${node.span.line}:${node.span.col}`);
+    }
+  });
+  const decoder = new SourceMap(r.map);
+  for (const m of r.table) {
+    const e = decoder.findEntry(m.generatedLine, m.generatedColumn);
+    assert.deepEqual([e.originalLine, e.originalColumn, e.name ?? null], [m.originalLine, m.originalColumn, m.name]);
   }
 });
